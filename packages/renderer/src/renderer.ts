@@ -111,6 +111,7 @@ export class Renderer {
       if (!inView({ x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 })) continue;
       const selected = scene.connectorSelection.has(c.id);
       this.drawConnector(route, c.style, selected ? SELECTION_COLOR : "#6B7280", 2 / z);
+      if (c.label && drawText) this.connectorLabel(route, c.label);
     }
 
     // Pass 3: content nodes in z-order.
@@ -380,6 +381,41 @@ export class Renderer {
     const beforeLast = route[route.length - 2]!;
     if (style === "arrow" || style === "double") this.arrowhead(beforeLast, last, lineWidth);
     if (style === "double") this.arrowhead(route[1]!, first, lineWidth);
+  }
+
+  /** Label pill at the route's halfway point (by path length). */
+  private connectorLabel(route: Point[], label: string): void {
+    const { ctx } = this;
+    let total = 0;
+    const lens: number[] = [];
+    for (let i = 0; i < route.length - 1; i++) {
+      const l = Math.hypot(route[i + 1]!.x - route[i]!.x, route[i + 1]!.y - route[i]!.y);
+      lens.push(l);
+      total += l;
+    }
+    let remaining = total / 2;
+    let mid = route[0]!;
+    for (let i = 0; i < lens.length; i++) {
+      if (remaining <= lens[i]!) {
+        const t = lens[i]! ? remaining / lens[i]! : 0;
+        mid = {
+          x: route[i]!.x + (route[i + 1]!.x - route[i]!.x) * t,
+          y: route[i]!.y + (route[i + 1]!.y - route[i]!.y) * t,
+        };
+        break;
+      }
+      remaining -= lens[i]!;
+    }
+    ctx.font = `500 12px ${FONT_STACK}`;
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = CANVAS_BG;
+    ctx.beginPath();
+    ctx.roundRect(mid.x - tw / 2 - 6, mid.y - 9, tw + 12, 18, 9);
+    ctx.fill();
+    ctx.fillStyle = "#4B5563";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, mid.x - tw / 2, mid.y + 1);
+    ctx.textBaseline = "top";
   }
 
   private arrowhead(from: Point, to: Point, lineWidth: number): void {

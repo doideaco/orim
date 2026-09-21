@@ -10,6 +10,9 @@ The open, structured, agent-native visual canvas. See [PLAN.md](PLAN.md) for the
 - `apps/spike` — Phase 0 spike app: renderer perf, multiplayer, text-overlay glue.
 
 - `apps/web` — the editor app (toolbar, shortcuts, minimap, offline persistence).
+- `apps/mcp` — MCP server: agents read boards as Markdown/JSON/Mermaid/SVG and
+  write typed objects back through live sync (`.mcp.json` registers it for
+  Claude Code; smoke test in `apps/mcp/scripts/smoke.ts`).
 
 ## Run
 

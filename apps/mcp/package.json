@@ -1,0 +1,25 @@
+{
+  "name": "@orim/mcp",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hocuspocus/provider": "^4.7.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@orim/convert": "workspace:*",
+    "@orim/schema": "workspace:*",
+    "@orim/store": "workspace:*",
+    "ws": "^8.18.0",
+    "yjs": "^13.6.20",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/ws": "^8.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

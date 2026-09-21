@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "orim": {
+      "command": "node",
+      "args": ["--import", "tsx", "apps/mcp/src/server.ts"]
+    }
+  }
+}

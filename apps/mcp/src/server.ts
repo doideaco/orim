@@ -1,0 +1,244 @@
+/**
+ * Orim MCP server — boards as structured data for AI agents.
+ *
+ * Agents read a board as Markdown/JSON/Mermaid/SVG and write typed objects
+ * back. Every write goes through the live sync pipeline, so people watching
+ * the board see agent edits appear in real time.
+ */
+import { existsSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import type { Connector, Endpoint, Node, PaletteColor } from "@orim/schema";
+import { boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG } from "@orim/convert";
+import { docName, openBoard, settle, toExportBoard } from "./boards";
+
+const DB_PATH =
+  process.env.ORIM_DB_PATH ?? new URL("../../sync/.data/boards.db", import.meta.url).pathname;
+
+let idCounter = 0;
+const newId = () => `agent-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
+
+const server = new McpServer({ name: "orim", version: "0.1.0" });
+
+const boardArg = z.string().describe('Board name, e.g. "main" (the ?b= value in the board URL)');
+
+const color = z
+  .enum(["gray", "blue", "teal", "green", "yellow", "orange", "red", "pink", "violet"])
+  .optional();
+
+const CreateNode = z.object({
+  type: z.enum(["sticky", "shape", "frame", "text"]),
+  x: z.number(),
+  y: z.number(),
+  w: z.number().optional(),
+  h: z.number().optional(),
+  text: z.string().optional().describe("Sticky/shape/text content"),
+  title: z.string().optional().describe("Frame title"),
+  kind: z.enum(["rect", "ellipse", "diamond", "pill"]).optional().describe("Shape kind"),
+  color,
+  parent: z.string().optional().describe("Frame id to place this node inside"),
+});
+
+const CreateConnector = z.object({
+  from: z.union([z.string().describe("node id"), z.object({ x: z.number(), y: z.number() })]),
+  to: z.union([z.string(), z.object({ x: z.number(), y: z.number() })]),
+  label: z.string().optional(),
+  style: z.enum(["line", "arrow", "double"]).optional(),
+});
+
+const DEFAULT_SIZE: Record<string, { w: number; h: number }> = {
+  sticky: { w: 180, h: 120 },
+  shape: { w: 160, h: 100 },
+  frame: { w: 480, h: 320 },
+  text: { w: 280, h: 28 },
+};
+
+function buildNode(input: z.infer<typeof CreateNode>, index: string): Node {
+  const size = DEFAULT_SIZE[input.type]!;
+  const base = {
+    id: newId(),
+    parent: input.parent ?? null,
+    x: input.x,
+    y: input.y,
+    w: input.w ?? size.w,
+    h: input.h ?? size.h,
+    rotation: 0,
+    index,
+    locked: false,
+    data: {},
+  };
+  const c = (fallback: PaletteColor): PaletteColor => input.color ?? fallback;
+  switch (input.type) {
+    case "sticky":
+      return { ...base, type: "sticky", text: input.text ?? "", color: c("yellow"), author: "agent" };
+    case "shape":
+      return {
+        ...base, type: "shape", kind: input.kind ?? "rect",
+        text: input.text ?? "", color: c("blue"), fillStyle: "solid",
+      };
+    case "frame":
+      return { ...base, type: "frame", title: input.title ?? input.text ?? "Frame" };
+    case "text":
+      return { ...base, type: "text", text: input.text ?? "", fontSize: 16 };
+  }
+}
+
+const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
+
+server.tool(
+  "list_boards",
+  "List all Orim boards on this server with object counts and last-updated times.",
+  {},
+  async () => {
+    if (!existsSync(DB_PATH)) return text("No boards yet (sync server has no database).");
+    const db = new DatabaseSync(DB_PATH, { readOnly: true });
+    try {
+      const rows = db
+        .prepare("SELECT name, length(state) AS bytes, updated_at FROM boards ORDER BY updated_at DESC")
+        .all() as { name: string; bytes: number; updated_at: number }[];
+      const lines = rows.map((r) => {
+        const bare = r.name.replace(/^orim-/, "");
+        return `- ${bare} (${r.bytes} bytes, updated ${new Date(r.updated_at).toISOString()})`;
+      });
+      return text(lines.length ? lines.join("\n") : "No boards yet.");
+    } finally {
+      db.close();
+    }
+  },
+);
+
+server.tool(
+  "read_board",
+  "Read a board. Formats: markdown (reading-order outline — best for understanding), json (full typed structure with ids — required before updating), mermaid (diagram structure), svg (visual render).",
+  {
+    board: boardArg,
+    format: z.enum(["markdown", "json", "mermaid", "svg"]).default("markdown"),
+  },
+  async ({ board, format }) => {
+    const { store } = await openBoard(board);
+    const exp = toExportBoard(store, board);
+    switch (format) {
+      case "json": return text(JSON.stringify(boardToJSON(exp, docName(board)), null, 2));
+      case "mermaid": return text(boardToMermaid(exp));
+      case "svg": return text(boardToSVG(exp));
+      default: return text(boardToMarkdown(exp));
+    }
+  },
+);
+
+server.tool(
+  "create_objects",
+  "Create nodes and/or connectors on a board. Everyone viewing the board sees them appear live. Connector endpoints reference node ids (existing ones, or by array position via $0, $1, … for nodes created in this same call).",
+  {
+    board: boardArg,
+    nodes: z.array(CreateNode).default([]),
+    connectors: z.array(CreateConnector).default([]),
+  },
+  async ({ board, nodes, connectors }) => {
+    const { store } = await openBoard(board);
+    const created: Node[] = [];
+    store.transact(() => {
+      for (const input of nodes) {
+        let parent = input.parent;
+        if (parent) {
+          const m = /^\$(\d+)$/.exec(parent);
+          if (m) parent = created[Number(m[1])]?.id;
+          if (!parent || (!m && !store.getNode(parent))) {
+            throw new Error(`Unknown parent reference: ${input.parent}`);
+          }
+        }
+        const node = buildNode({ ...input, parent }, store.topIndex());
+        store.upsertNode(node);
+        created.push(node);
+      }
+      for (const input of connectors) {
+        const resolve = (ref: string | { x: number; y: number }): Endpoint => {
+          if (typeof ref !== "string") return { point: ref };
+          const m = /^\$(\d+)$/.exec(ref);
+          const nodeId = m ? created[Number(m[1])]?.id : ref;
+          if (!nodeId || (!m && !store.getNode(nodeId))) {
+            throw new Error(`Unknown node reference: ${ref}`);
+          }
+          return { node: nodeId, anchor: "auto" };
+        };
+        const connector: Connector = {
+          id: newId(),
+          type: "connector",
+          from: resolve(input.from),
+          to: resolve(input.to),
+          label: input.label ?? "",
+          style: input.style ?? "arrow",
+          index: store.topIndex(),
+          data: {},
+        };
+        store.upsertConnector(connector);
+      }
+    });
+    await settle();
+    return text(
+      `Created ${created.length} node(s), ${connectors.length} connector(s).\n` +
+        created.map((n, i) => `$${i} → ${n.id} (${n.type})`).join("\n"),
+    );
+  },
+);
+
+server.tool(
+  "update_objects",
+  "Update fields on existing nodes by id (position, size, text, color, title, parent). Read the board as json first to get ids.",
+  {
+    board: boardArg,
+    updates: z.array(
+      z.object({
+        id: z.string(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        w: z.number().optional(),
+        h: z.number().optional(),
+        text: z.string().optional(),
+        title: z.string().optional(),
+        color,
+        parent: z.string().nullable().optional(),
+      }),
+    ),
+  },
+  async ({ board, updates }) => {
+    const { store } = await openBoard(board);
+    let applied = 0;
+    store.transact(() => {
+      for (const { id, ...patch } of updates) {
+        if (!store.getNode(id)) continue;
+        const clean = Object.fromEntries(
+          Object.entries(patch).filter(([, v]) => v !== undefined),
+        );
+        store.updateNode(id, clean as Partial<Node>);
+        applied++;
+      }
+    });
+    await settle();
+    return text(`Updated ${applied}/${updates.length} node(s).`);
+  },
+);
+
+server.tool(
+  "delete_objects",
+  "Delete nodes and/or connectors by id. Deleting a node also removes connectors attached to it.",
+  {
+    board: boardArg,
+    node_ids: z.array(z.string()).default([]),
+    connector_ids: z.array(z.string()).default([]),
+  },
+  async ({ board, node_ids, connector_ids }) => {
+    const { store } = await openBoard(board);
+    store.transact(() => {
+      for (const id of node_ids) store.deleteNode(id);
+      for (const id of connector_ids) store.deleteConnector(id);
+    });
+    await settle();
+    return text(`Deleted ${node_ids.length} node(s), ${connector_ids.length} connector(s).`);
+  },
+);
+
+await server.connect(new StdioServerTransport());
+console.error("[orim-mcp] ready (stdio)");
