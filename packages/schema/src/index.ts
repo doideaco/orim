@@ -87,12 +87,38 @@ export const InkNode = BaseNode.extend({
   size: z.number().default(4),
 });
 
+export const TableColumn = z.object({
+  id: z.string(),
+  name: z.string().default(""),
+  /** Relative width weight; rendered widths scale to fit the node. */
+  w: z.number().positive().default(160),
+});
+export type TableColumn = z.infer<typeof TableColumn>;
+
+export const TableRow = z.object({
+  id: z.string(),
+  /** columnId -> cell text. */
+  cells: z.record(z.string(), z.string()).default({}),
+});
+export type TableRow = z.infer<typeof TableRow>;
+
+/** A grid/sheet on the canvas. Rows are structured records: they can be
+ *  connected to, generated into stickies, and carried through exports. */
+export const TableNode = BaseNode.extend({
+  type: z.literal("table"),
+  title: z.string().default("Table"),
+  columns: z.array(TableColumn),
+  rows: z.array(TableRow),
+});
+export type TableNode = z.infer<typeof TableNode>;
+
 export const Node = z.discriminatedUnion("type", [
   StickyNode,
   ShapeNode,
   FrameNode,
   TextNode,
   InkNode,
+  TableNode,
 ]);
 export type Node = z.infer<typeof Node>;
 export type NodeType = Node["type"];

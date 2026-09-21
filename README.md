@@ -29,5 +29,5 @@ picks a board, so a link is a share link. Boards also live in IndexedDB, so the 
 works fully offline and re-syncs when the server is back.
 
 Tools: V select · H hand · N sticky · R/O/D shapes · T text · F frame · C connector ·
-P pen. ⌘Z undo, ⌘C/⌘V/⌘D copy/paste/duplicate, 1 zoom-to-fit, 0 reset zoom.
+P pen · G table. ⌘Z undo, ⌘C/⌘V/⌘D copy/paste/duplicate, 1 zoom-to-fit, 0 reset zoom.
 `apps/spike` (port 5180) is the original Phase 0 spike, kept for perf benchmarking.

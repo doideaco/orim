@@ -146,6 +146,72 @@ export class DataPanel {
     }
   }
 
+  private renderTableActions(table: Extract<Node, { type: "table" }>): void {
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const btn = (label: string, onClick: () => void) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        onClick();
+        this.onChange();
+        this.scheduleRefresh();
+      });
+      actions.appendChild(b);
+    };
+    const rid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+    btn("+ Row", () => {
+      const live = this.store.getNode(table.id);
+      if (live?.type !== "table") return;
+      this.store.updateNode(table.id, {
+        rows: [...live.rows, { id: rid(), cells: {} }],
+        h: Math.max(live.h, (live.rows.length + 2) * 34),
+      });
+    });
+    btn("+ Column", () => {
+      const live = this.store.getNode(table.id);
+      if (live?.type !== "table") return;
+      this.store.updateNode(table.id, {
+        columns: [...live.columns, { id: rid(), name: `Column ${live.columns.length + 1}`, w: 160 }],
+        w: live.w + 160,
+      });
+    });
+    btn("Rows → stickies", () => {
+      const live = this.store.getNode(table.id);
+      if (live?.type !== "table" || !live.rows.length) return;
+      const firstCol = live.columns[0];
+      const cols = Math.max(1, Math.ceil(Math.sqrt(live.rows.length)));
+      this.editor.clearSelection();
+      this.store.transact(() => {
+        live.rows.forEach((row, i) => {
+          // The row becomes a sticky; every cell rides along in `data`.
+          const data: Record<string, unknown> = { table: live.id, row: row.id };
+          for (const c of live.columns) {
+            if (row.cells[c.id]) data[c.name || c.id] = row.cells[c.id];
+          }
+          const sticky: Node = {
+            id: rid(),
+            type: "sticky",
+            parent: null,
+            x: live.x + live.w + 60 + (i % cols) * 204,
+            y: live.y + Math.floor(i / cols) * 144,
+            w: 180, h: 120,
+            rotation: 0,
+            index: this.store.topIndex(),
+            locked: false,
+            data,
+            text: row.cells[firstCol?.id ?? ""] ?? "",
+            color: "yellow",
+          };
+          this.store.upsertNode(sticky);
+          this.editor.selection.add(sticky.id);
+        });
+      });
+    });
+    this.inspector.appendChild(actions);
+  }
+
   private renderInspector(): void {
     const node = this.editor.singleSelectedNode();
     if (!node) {
@@ -175,7 +241,13 @@ export class DataPanel {
     if ("text" in node && node.text) {
       field("text", node.text.replace(/\n/g, " ").slice(0, 80));
     }
+    if (node.type === "table") {
+      field("columns", String(node.columns.length));
+      field("rows", String(node.rows.length));
+    }
     this.inspector.appendChild(dl);
+
+    if (node.type === "table") this.renderTableActions(node);
 
     const label = document.createElement("label");
     label.textContent = "data (JSON) — typed fields on this object";

@@ -1,8 +1,10 @@
 import type { Connector, Node, NodeId } from "@orim/schema";
 import {
   connectorRoute, elbowRoute, nodeRect, visibleWorldRect, toScreen,
+  tableColumnEdges, TABLE_ROW_H,
   type Camera, type Point, type Rect,
 } from "@orim/editor";
+import type { TableNode } from "@orim/schema";
 import { getStroke } from "perfect-freehand";
 import { PALETTE, SELECTION_COLOR, CANVAS_BG } from "./colors";
 
@@ -105,7 +107,10 @@ export class Renderer {
       visible++;
 
       if (!drawDetail) {
-        ctx.fillStyle = n.type === "ink" ? "#9CA3AF" : PALETTE[n.type === "text" ? "gray" : n.color].fill;
+        ctx.fillStyle =
+          n.type === "ink" ? "#9CA3AF" :
+          n.type === "table" ? "#FFFFFF" :
+          PALETTE[n.type === "text" ? "gray" : n.color].fill;
         if (n.type !== "text") ctx.fillRect(n.x, n.y, n.w, n.h);
         continue;
       }
@@ -158,6 +163,9 @@ export class Renderer {
           ctx.restore();
           break;
         }
+        case "table":
+          this.drawTable(n, z, drawText);
+          break;
       }
 
       if (scene.selection.has(n.id)) {
@@ -382,6 +390,60 @@ export class Renderer {
     const beforeLast = route[route.length - 2]!;
     if (style === "arrow" || style === "double") this.arrowhead(beforeLast, last, lineWidth);
     if (style === "double") this.arrowhead(route[1]!, first, lineWidth);
+  }
+
+  private drawTable(n: TableNode, z: number, drawText: boolean): void {
+    const { ctx } = this;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(n.x, n.y, n.w, n.h);
+    // Header band.
+    ctx.fillStyle = "#F5F5F3";
+    ctx.fillRect(n.x, n.y, n.w, TABLE_ROW_H);
+    ctx.strokeStyle = "#D6D6D2";
+    ctx.lineWidth = 1 / Math.max(z, 0.5);
+    ctx.strokeRect(n.x, n.y, n.w, n.h);
+
+    const edges = tableColumnEdges(n);
+    ctx.beginPath();
+    for (let c = 1; c < edges.length - 1; c++) {
+      ctx.moveTo(n.x + edges[c]!, n.y);
+      ctx.lineTo(n.x + edges[c]!, n.y + n.h);
+    }
+    const rowCount = Math.min(n.rows.length, Math.floor(n.h / TABLE_ROW_H) - 1);
+    for (let r = 0; r <= rowCount; r++) {
+      ctx.moveTo(n.x, n.y + (r + 1) * TABLE_ROW_H);
+      ctx.lineTo(n.x + n.w, n.y + (r + 1) * TABLE_ROW_H);
+    }
+    ctx.stroke();
+
+    if (!drawText) return;
+    ctx.textBaseline = "middle";
+    const cellText = (text: string, colStart: number, colEnd: number, y: number, bold: boolean, color: string) => {
+      if (!text) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(n.x + colStart + 4, y - TABLE_ROW_H / 2, colEnd - colStart - 8, TABLE_ROW_H);
+      ctx.clip();
+      ctx.font = `${bold ? "600 " : ""}12.5px ${FONT_STACK}`;
+      ctx.fillStyle = color;
+      ctx.fillText(text, n.x + colStart + 10, y + 1);
+      ctx.restore();
+    };
+    n.columns.forEach((col, c) => {
+      cellText(col.name, edges[c]!, edges[c + 1]!, n.y + TABLE_ROW_H / 2, true, "#6B7280");
+    });
+    n.rows.slice(0, rowCount).forEach((row, r) => {
+      const y = n.y + (r + 1) * TABLE_ROW_H + TABLE_ROW_H / 2;
+      n.columns.forEach((col, c) => {
+        cellText(row.cells[col.id] ?? "", edges[c]!, edges[c + 1]!, y, false, "#1F2430");
+      });
+    });
+    // Title above, like frames.
+    ctx.font = `600 13px ${FONT_STACK}`;
+    ctx.fillStyle = "#6B7280";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(n.title, n.x + 1, n.y - 8 / z);
+    ctx.textBaseline = "top";
   }
 
   /** Label pill at the route's halfway point (by path length). */

@@ -11,6 +11,20 @@ function bullet(n: Node): string {
   return `- ${label}`;
 }
 
+/** Tables export as real Markdown tables; everything else as a bullet. */
+function nodeBlock(n: Node): string[] {
+  if (n.type !== "table") return [bullet(n)];
+  const cell = (s: string) => s.replace(/\n/g, " ").replace(/\|/g, "\\|") || " ";
+  return [
+    `**${n.title}**`,
+    "",
+    `| ${n.columns.map((c) => cell(c.name)).join(" | ")} |`,
+    `| ${n.columns.map(() => "---").join(" | ")} |`,
+    ...n.rows.map((r) => `| ${n.columns.map((c) => cell(r.cells[c.id] ?? "")).join(" | ")} |`),
+    "",
+  ];
+}
+
 export function boardToMarkdown(board: ExportBoard): string {
   const ordered = orderBoard(board);
   const byId = new Map(board.nodes.map((n) => [n.id, n]));
@@ -18,13 +32,13 @@ export function boardToMarkdown(board: ExportBoard): string {
 
   for (const { frame, children } of ordered.frames) {
     lines.push(`## ${frame.title}`, "");
-    for (const child of children) lines.push(bullet(child));
+    for (const child of children) lines.push(...nodeBlock(child));
     if (children.length) lines.push("");
   }
 
   if (ordered.loose.length) {
     if (ordered.frames.length) lines.push(`## Elsewhere on the board`, "");
-    for (const n of ordered.loose) lines.push(bullet(n));
+    for (const n of ordered.loose) lines.push(...nodeBlock(n));
     lines.push("");
   }
 

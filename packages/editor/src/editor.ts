@@ -1,6 +1,7 @@
 import type {
-  Connector, Endpoint, Node, PaletteColor, ShapeNode,
+  Connector, Endpoint, Node, PaletteColor, ShapeNode, TableNode,
 } from "@orim/schema";
+import { tableCellAt, tableHeight } from "./table-geometry";
 import type { BoardStore } from "@orim/store";
 import type { Camera, Point, Rect } from "./camera";
 import {
@@ -10,7 +11,7 @@ import {
 
 export type ToolName =
   | "select" | "hand" | "sticky" | "rect" | "ellipse" | "diamond" | "pill"
-  | "text" | "frame" | "connector" | "ink";
+  | "text" | "frame" | "connector" | "ink" | "table";
 
 const SHAPE_TOOLS: Record<string, ShapeNode["kind"]> = {
   rect: "rect", ellipse: "ellipse", diamond: "diamond", pill: "pill",
@@ -19,6 +20,8 @@ const SHAPE_TOOLS: Record<string, ShapeNode["kind"]> = {
 export interface EditorHooks {
   newId(): string;
   openTextEditor(node: Node): void;
+  /** Edit a table cell; rowIndex -1 is the header (renames the column). */
+  openTableCell(table: TableNode, rowIndex: number, colIndex: number): void;
   defaultColor(): PaletteColor;
   defaultFillStyle(): ShapeNode["fillStyle"];
 }
@@ -232,6 +235,22 @@ export class Editor {
         this.drag = { kind: "ink", points: [world.x, world.y, 0.5] };
         this.draftInk = this.drag.points;
         return;
+
+      case "table": {
+        const columns = ["Item", "Owner", "Status"].map((name, i) => ({
+          id: `c${i}`, name, w: 160,
+        }));
+        const rows = [0, 1, 2].map((i) => ({ id: this.hooks.newId(), cells: {} }));
+        const node = this.makeNode({
+          type: "table",
+          x: world.x - 240, y: world.y - tableHeight(rows.length) / 2,
+          w: 480, h: tableHeight(rows.length),
+          title: "Table", columns, rows,
+        });
+        this.selectOnly(node.id);
+        this.tool = "select";
+        return;
+      }
     }
   }
 
@@ -410,6 +429,12 @@ export class Editor {
   dblClick(info: PointerInfo): void {
     if (this.tool !== "select") return;
     const hit = this.hitNode(info.world);
+    if (hit && hit.type === "table") {
+      this.selectOnly(hit.id);
+      const cell = tableCellAt(hit, info.world);
+      if (cell) this.hooks.openTableCell(hit, cell.rowIndex, cell.colIndex);
+      return;
+    }
     if (hit && (hit.type === "sticky" || hit.type === "shape" || hit.type === "text" || hit.type === "frame")) {
       this.selectOnly(hit.id);
       this.hooks.openTextEditor(hit);

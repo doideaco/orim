@@ -4,7 +4,8 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { BoardStore } from "@orim/store";
 import type { PaletteColor } from "@orim/schema";
 import {
-  Editor, cameraToFit, toScreen, toWorld, zoomAt, type Camera, type ToolName,
+  Editor, cameraToFit, tableCellRect, toScreen, toWorld, zoomAt,
+  type Camera, type ToolName,
 } from "@orim/editor";
 import {
   Renderer, PALETTE, PALETTE_KEYS, CURSOR_COLORS, type PresenceState,
@@ -16,7 +17,7 @@ import { TextEditorOverlay, isEditable } from "./editor-overlay";
 import { DataPanel } from "./data-panel";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
-  Type, Frame, MoveUpRight, Pencil, Download, type IconNode,
+  Type, Frame, MoveUpRight, Pencil, Download, Table, type IconNode,
 } from "lucide";
 
 // Board id comes from the URL (?b=my-board), so a link IS a share link.
@@ -47,6 +48,7 @@ const editor = new Editor(store, camera, {
   newId,
   defaultColor: () => defaultColor,
   defaultFillStyle: () => defaultFillStyle,
+  openTableCell: (table, rowIndex, colIndex) => openTableCellEditor(table, rowIndex, colIndex),
   openTextEditor: (node) => {
     if (node.type === "frame") {
       openFrameTitleEditor(node);
@@ -86,6 +88,70 @@ function openFrameTitleEditor(frame: { id: string; x: number; y: number; title: 
 const dataPanel = new DataPanel(store, editor, camera, () => {
   dirty = true;
 });
+
+function openTableCellEditor(
+  table: import("@orim/schema").TableNode,
+  rowIndex: number,
+  colIndex: number,
+): void {
+  const cell = tableCellRect(table, rowIndex, colIndex);
+  const s = toScreen(camera, cell);
+  const col = table.columns[colIndex]!;
+  const isHeader = rowIndex === -1;
+  const row = isHeader ? null : table.rows[rowIndex]!;
+  const input = document.createElement("input");
+  input.value = isHeader ? col.name : row!.cells[col.id] ?? "";
+  input.style.cssText = `position:absolute; left:${s.x}px; top:${s.y}px;
+    width:${cell.w * camera.zoom}px; height:${cell.h * camera.zoom}px;
+    pointer-events:auto; font:${isHeader ? "600 " : ""}12.5px -apple-system,system-ui,sans-serif;
+    color:#1f2430; padding:0 10px; border:none; outline:2px solid var(--accent);
+    background:#fff; box-sizing:border-box;`;
+  document.getElementById("overlay-root")!.appendChild(input);
+  input.focus();
+  input.select();
+  let cancelled = false;
+  const commit = () => {
+    if (!cancelled) {
+      const value = input.value;
+      const live = store.getNode(table.id);
+      if (live?.type === "table") {
+        if (isHeader) {
+          store.updateNode(table.id, {
+            columns: live.columns.map((c) => (c.id === col.id ? { ...c, name: value } : c)),
+          });
+        } else {
+          store.updateNode(table.id, {
+            rows: live.rows.map((r) =>
+              r.id === row!.id ? { ...r, cells: { ...r.cells, [col.id]: value } } : r,
+            ),
+          });
+        }
+      }
+    }
+    input.remove();
+    dirty = true;
+    dataPanel.scheduleRefresh();
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") {
+      cancelled = true;
+      input.blur();
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      input.blur();
+      const live = store.getNode(table.id);
+      if (live?.type === "table") {
+        const nextCol = (colIndex + 1) % live.columns.length;
+        const nextRow = nextCol === 0 && !isHeader ? Math.min(rowIndex + 1, live.rows.length - 1) : rowIndex;
+        openTableCellEditor(live, nextRow, nextCol);
+      }
+    }
+  });
+}
 
 // --- sync --------------------------------------------------------------------
 
@@ -185,7 +251,7 @@ canvas.addEventListener(
 
 const TOOL_KEYS: Record<string, ToolName> = {
   v: "select", h: "hand", n: "sticky", r: "rect", o: "ellipse",
-  d: "diamond", t: "text", f: "frame", c: "connector", p: "ink",
+  d: "diamond", t: "text", f: "frame", c: "connector", p: "ink", g: "table",
 };
 
 window.addEventListener("keydown", (e) => {
@@ -252,7 +318,7 @@ window.addEventListener("resize", () => {
 const TOOL_ICONS: Record<string, IconNode> = {
   select: MousePointer2, hand: Hand, sticky: StickyNote, rect: Square,
   ellipse: Circle, diamond: Diamond, text: Type, frame: Frame,
-  connector: MoveUpRight, ink: Pencil,
+  connector: MoveUpRight, ink: Pencil, table: Table,
 };
 
 const toolButtons = [...document.querySelectorAll<HTMLButtonElement>("#toolbar [data-tool]")];

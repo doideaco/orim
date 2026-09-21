@@ -30,16 +30,19 @@ const color = z
   .optional();
 
 const CreateNode = z.object({
-  type: z.enum(["sticky", "shape", "frame", "text"]),
+  type: z.enum(["sticky", "shape", "frame", "text", "table"]),
   x: z.number(),
   y: z.number(),
   w: z.number().optional(),
   h: z.number().optional(),
   text: z.string().optional().describe("Sticky/shape/text content"),
-  title: z.string().optional().describe("Frame title"),
+  title: z.string().optional().describe("Frame or table title"),
   kind: z.enum(["rect", "ellipse", "diamond", "pill"]).optional().describe("Shape kind"),
   color,
   parent: z.string().optional().describe("Frame id to place this node inside"),
+  columns: z.array(z.string()).optional().describe("Table column names"),
+  rows: z.array(z.array(z.string())).optional()
+    .describe("Table rows: cell text per column, in column order"),
 });
 
 const CreateConnector = z.object({
@@ -54,6 +57,7 @@ const DEFAULT_SIZE: Record<string, { w: number; h: number }> = {
   shape: { w: 160, h: 100 },
   frame: { w: 480, h: 320 },
   text: { w: 280, h: 28 },
+  table: { w: 480, h: 136 },
 };
 
 function buildNode(input: z.infer<typeof CreateNode>, index: string): Node {
@@ -83,6 +87,25 @@ function buildNode(input: z.infer<typeof CreateNode>, index: string): Node {
       return { ...base, type: "frame", title: input.title ?? input.text ?? "Frame" };
     case "text":
       return { ...base, type: "text", text: input.text ?? "", fontSize: 16 };
+    case "table": {
+      const names = input.columns ?? ["Column 1", "Column 2", "Column 3"];
+      const columns = names.map((name, i) => ({ id: `c${i}`, name, w: 160 }));
+      const rows = (input.rows ?? []).map((cells, r) => ({
+        id: `r${r}`,
+        cells: Object.fromEntries(
+          cells.map((v, i) => [`c${i}`, v] as const).filter(([, v]) => v !== ""),
+        ),
+      }));
+      return {
+        ...base,
+        type: "table",
+        title: input.title ?? "Table",
+        w: input.w ?? columns.length * 160,
+        h: input.h ?? (rows.length + 1) * 34,
+        columns,
+        rows,
+      };
+    }
   }
 }
 

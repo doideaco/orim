@@ -60,5 +60,6 @@ export function nodeLabel(n: Node): string {
     case "text": return n.text || "(empty text)";
     case "frame": return n.title;
     case "ink": return "(drawing)";
+    case "table": return n.title;
   }
 }

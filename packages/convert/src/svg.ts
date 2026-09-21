@@ -5,7 +5,9 @@
  * runs in Node — e.g. from the MCP server.
  */
 import type { Connector, Node } from "@orim/schema";
-import { connectorRoute, unionRects, nodeRect, type Point } from "@orim/editor";
+import {
+  connectorRoute, unionRects, nodeRect, tableColumnEdges, TABLE_ROW_H, type Point,
+} from "@orim/editor";
 import { PALETTE, CANVAS_BG } from "@orim/renderer";
 import { getStroke } from "perfect-freehand";
 import type { ExportBoard } from "./order";
@@ -132,6 +134,31 @@ export function boardToSVG(board: ExportBoard): string {
       case "text":
         if (n.text) parts.push(textBlock(n, n.text, "#1F2430", n.fontSize, false, 4));
         break;
+      case "table": {
+        parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" fill="#FFFFFF" stroke="#D6D6D2" />`);
+        parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${TABLE_ROW_H}" fill="#F5F5F3" />`);
+        const edges = tableColumnEdges(n);
+        for (let c = 1; c < edges.length - 1; c++) {
+          parts.push(`<line x1="${n.x + edges[c]!}" y1="${n.y}" x2="${n.x + edges[c]!}" y2="${n.y + n.h}" stroke="#D6D6D2" />`);
+        }
+        const visibleRows = Math.min(n.rows.length, Math.floor(n.h / TABLE_ROW_H) - 1);
+        for (let r = 0; r <= visibleRows; r++) {
+          const y = n.y + (r + 1) * TABLE_ROW_H;
+          parts.push(`<line x1="${n.x}" y1="${y}" x2="${n.x + n.w}" y2="${y}" stroke="#D6D6D2" />`);
+        }
+        const cellText = (s: string, colStart: number, colEnd: number, y: number, bold: boolean) => {
+          if (!s) return;
+          const maxChars = Math.max(3, Math.floor((colEnd - colStart - 16) / (12.5 * CHAR_W)));
+          parts.push(`<text x="${n.x + colStart + 10}" y="${y + 4.5}" font-family="${FONT}" font-size="12.5"${bold ? ' font-weight="600"' : ""} fill="${bold ? "#6B7280" : "#1F2430"}">${esc(s.replace(/\n/g, " ").slice(0, maxChars))}</text>`);
+        };
+        n.columns.forEach((col, c) => cellText(col.name, edges[c]!, edges[c + 1]!, n.y + TABLE_ROW_H / 2, true));
+        n.rows.slice(0, visibleRows).forEach((row, r) => {
+          const y = n.y + (r + 1) * TABLE_ROW_H + TABLE_ROW_H / 2;
+          n.columns.forEach((col, c) => cellText(row.cells[col.id] ?? "", edges[c]!, edges[c + 1]!, y, false));
+        });
+        parts.push(`<text x="${n.x + 1}" y="${n.y - 8}" font-family="${FONT}" font-size="13" font-weight="600" fill="#6B7280">${esc(n.title)}</text>`);
+        break;
+      }
       case "ink": {
         const pts: [number, number, number][] = [];
         for (let i = 0; i + 1 < n.points.length; i += 3) {
