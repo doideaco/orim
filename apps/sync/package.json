@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@hocuspocus/extension-database": "^4.7.0",
-    "@hocuspocus/server": "^4.7.0"
+    "@hocuspocus/server": "^4.7.0",
+    "yjs": "^13.6.20"
   },
   "devDependencies": {
     "@types/node": "^24",
