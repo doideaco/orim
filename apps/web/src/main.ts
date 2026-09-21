@@ -15,6 +15,7 @@ import {
 } from "@orim/convert";
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
 import { DataPanel } from "./data-panel";
+import { A11yMirror } from "./a11y-mirror";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, type IconNode,
@@ -53,25 +54,27 @@ const editor = new Editor(store, camera, {
     if (node.type === "frame") {
       openFrameTitleEditor(node);
     } else if (isEditable(node)) {
-      overlay.open(node, camera, (text) => {
-        // A cell-bound node writes through to its source cell; the
-        // reconciler then updates every bound view of that cell.
-        const src = cellSource(node);
-        const table = src ? store.getNode(src.table) : undefined;
-        if (src && table?.type === "table") {
-          store.updateNode(src.table, {
-            rows: table.rows.map((r) =>
-              r.id === src.row ? { ...r, cells: { ...r.cells, [src.column]: text } } : r,
-            ),
-          });
-        } else {
-          store.updateNode(node.id, { text });
-        }
-      });
+      overlay.open(node, camera, (text) => commitNodeText(node, text));
     }
     dirty = true;
   },
 });
+
+/** Text commit with cell-binding write-through: a bound node writes to
+ *  its source cell and the reconciler updates every bound view. */
+function commitNodeText(node: import("@orim/schema").Node, text: string): void {
+  const src = cellSource(node);
+  const table = src ? store.getNode(src.table) : undefined;
+  if (src && table?.type === "table") {
+    store.updateNode(src.table, {
+      rows: table.rows.map((r) =>
+        r.id === src.row ? { ...r, cells: { ...r.cells, [src.column]: text } } : r,
+      ),
+    });
+  } else {
+    store.updateNode(node.id, { text });
+  }
+}
 
 function openFrameTitleEditor(frame: { id: string; x: number; y: number; title: string }): void {
   const s = toScreen(camera, { x: frame.x, y: frame.y - 26 / camera.zoom });
@@ -101,6 +104,21 @@ function openFrameTitleEditor(frame: { id: string; x: number; y: number; title: 
 
 const dataPanel = new DataPanel(store, editor, camera, () => {
   dirty = true;
+});
+
+const a11y = new A11yMirror(store, editor, camera, {
+  onChange: () => {
+    dirty = true;
+    dataPanel.scheduleRefresh();
+  },
+  openEditor: (node) => {
+    if (node.type === "frame") openFrameTitleEditor(node);
+    else if (isEditable(node)) {
+      overlay.open(node, camera, (text) => commitNodeText(node, text));
+      dirty = true;
+    }
+  },
+  overlayRoot: document.getElementById("overlay-root")!,
 });
 
 function openTableCellEditor(
@@ -288,6 +306,7 @@ canvas.addEventListener("pointerup", (e) => {
   syncToolbar();
   dirty = true;
   dataPanel.scheduleRefresh();
+  a11y.scheduleRebuild();
 });
 
 canvas.addEventListener("dblclick", (e) => {
@@ -401,8 +420,15 @@ for (const btn of toolButtons) {
 
 function syncToolbar(): void {
   for (const btn of toolButtons) {
-    btn.classList.toggle("active", btn.dataset.tool === editor.tool);
+    const active = btn.dataset.tool === editor.tool;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
   }
+}
+
+// Buttons that only show an icon or a glyph still need a name.
+for (const btn of document.querySelectorAll<HTMLElement>("button[title]")) {
+  if (!btn.getAttribute("aria-label")) btn.setAttribute("aria-label", btn.title);
 }
 
 // One swatch shows the active fill + stroke; clicking opens the popover.
