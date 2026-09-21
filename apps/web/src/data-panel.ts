@@ -4,7 +4,7 @@
  * accessibility tree use) plus an inspector for the selected object,
  * including its free-form `data` bag. Click a row to select and jump to it.
  */
-import type { Connector, Node } from "@orim/schema";
+import { cellSource, type Connector, type Node } from "@orim/schema";
 import { orderBoard, nodeLabel, type ExportBoard } from "@orim/convert";
 import { PALETTE } from "@orim/renderer";
 import type { BoardStore } from "@orim/store";
@@ -180,33 +180,39 @@ export class DataPanel {
     btn("Rows → stickies", () => {
       const live = this.store.getNode(table.id);
       if (live?.type !== "table" || !live.rows.length) return;
-      const firstCol = live.columns[0];
-      const cols = Math.max(1, Math.ceil(Math.sqrt(live.rows.length)));
+      const column = live.columns[0]?.id;
+      if (!column) return;
+      const bound = new Set(
+        [...this.store.nodes.values()]
+          .map((n) => cellSource(n))
+          .filter((s) => s?.table === live.id)
+          .map((s) => s!.row),
+      );
       this.editor.clearSelection();
       this.store.transact(() => {
-        live.rows.forEach((row, i) => {
-          // The row becomes a sticky; every cell rides along in `data`.
-          const data: Record<string, unknown> = { table: live.id, row: row.id };
-          for (const c of live.columns) {
-            if (row.cells[c.id]) data[c.name || c.id] = row.cells[c.id];
-          }
+        let placed = 0;
+        for (const row of live.rows) {
+          if (bound.has(row.id)) continue; // already materialized somewhere
+          // A bound sticky: text derives from the cell (the cell is the
+          // source of truth) and its position is entirely its own.
           const sticky: Node = {
             id: rid(),
             type: "sticky",
             parent: null,
-            x: live.x + live.w + 60 + (i % cols) * 204,
-            y: live.y + Math.floor(i / cols) * 144,
+            x: live.x + live.w + 80,
+            y: live.y + placed * 144,
             w: 180, h: 120,
             rotation: 0,
             index: this.store.topIndex(),
             locked: false,
-            data,
-            text: row.cells[firstCol?.id ?? ""] ?? "",
+            data: { $source: { table: live.id, row: row.id, column } },
+            text: row.cells[column] ?? "",
             color: "yellow",
           };
           this.store.upsertNode(sticky);
           this.editor.selection.add(sticky.id);
-        });
+          placed++;
+        }
       });
     });
     this.inspector.appendChild(actions);
@@ -238,6 +244,13 @@ export class DataPanel {
       field("parent", p ? nodeLabel(p) : node.parent);
     }
     if ("author" in node && node.author) field("author", node.author);
+    const src = cellSource(node);
+    if (src) {
+      const t = this.store.getNode(src.table);
+      const colName =
+        t?.type === "table" ? t.columns.find((c) => c.id === src.column)?.name : undefined;
+      field("bound to", `${t ? nodeLabel(t) : src.table} · ${colName ?? src.column}`);
+    }
     if ("text" in node && node.text) {
       field("text", node.text.replace(/\n/g, " ").slice(0, 80));
     }

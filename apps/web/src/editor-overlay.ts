@@ -57,6 +57,7 @@ export class TextEditorOverlay {
 
     const dom = document.createElement("div");
     dom.className = "orim-text-editor";
+    if (node.type !== "text") dom.classList.add("centered");
     dom.style.width = `${node.w}px`;
     dom.style.height = `${node.h}px`;
     if (node.type === "text") {

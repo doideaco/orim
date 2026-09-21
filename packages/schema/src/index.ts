@@ -172,3 +172,32 @@ export function parseBoard(input: unknown): BoardDoc {
 export function emptyBoard(id: string, title = "Untitled board"): BoardDoc {
   return { schemaVersion: SCHEMA_VERSION, id, title, nodes: {}, connectors: {} };
 }
+
+// ---------------------------------------------------------------------------
+// Derived content
+// ---------------------------------------------------------------------------
+
+/**
+ * A node whose text derives from a table cell stores the binding at
+ * `data.$source`. The cell is the source of truth: edit the node and the
+ * cell updates; edit the cell and every bound node follows. The node's
+ * position stays entirely its own.
+ */
+export interface CellSource {
+  table: string;
+  row: string;
+  column: string;
+}
+
+export function cellSource(n: Node): CellSource | null {
+  const s = (n.data as { $source?: unknown })?.$source;
+  if (
+    s && typeof s === "object" &&
+    typeof (s as CellSource).table === "string" &&
+    typeof (s as CellSource).row === "string" &&
+    typeof (s as CellSource).column === "string"
+  ) {
+    return s as CellSource;
+  }
+  return null;
+}

@@ -30,6 +30,8 @@ export class BoardStore {
   private sorted: Node[] = [];
   private sortedDirty = true;
   private listeners = new Set<Listener>();
+  /** Bumped on every change; cheap cache-invalidation key for derived work. */
+  revision = 0;
 
   constructor(doc: Y.Doc = new Y.Doc()) {
     this.doc = doc;
@@ -56,6 +58,7 @@ export class BoardStore {
           }
         }
         this.sortedDirty = true;
+        this.revision++;
         this.emit();
       });
     };

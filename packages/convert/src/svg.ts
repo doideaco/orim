@@ -6,7 +6,7 @@
  */
 import type { Connector, Node } from "@orim/schema";
 import {
-  connectorRoute, unionRects, nodeRect, tableColumnEdges, TABLE_ROW_H, type Point,
+  routeConnector, unionRects, nodeRect, tableColumnEdges, TABLE_ROW_H, type Point,
 } from "@orim/editor";
 import { PALETTE, CANVAS_BG } from "@orim/renderer";
 import { getStroke } from "perfect-freehand";
@@ -111,7 +111,7 @@ export function boardToSVG(board: ExportBoard): string {
       case "sticky": {
         const c = PALETTE[n.color];
         parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="6" fill="${c.fill}" stroke="${c.edge}" />`);
-        if (n.text) parts.push(textBlock(n, n.text, c.text, FONT_SIZE, false));
+        if (n.text) parts.push(textBlock(n, n.text, c.text, FONT_SIZE, true));
         break;
       }
       case "shape": {
@@ -176,7 +176,7 @@ export function boardToSVG(board: ExportBoard): string {
 
   // Connectors above content, matching the canvas renderer.
   for (const c of board.connectors) {
-    const route = connectorRoute(c as Connector, getNode);
+    const route = routeConnector(c as Connector, getNode, board.nodes);
     if (!route || route.length < 2) continue;
     parts.push(`<path d="${pathFrom(route)}" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />`);
     const last = route[route.length - 1]!;

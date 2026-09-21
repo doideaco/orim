@@ -1,6 +1,6 @@
 import type { Connector, Node, NodeId } from "@orim/schema";
 import {
-  connectorRoute, elbowRoute, nodeRect, visibleWorldRect, toScreen,
+  elbowRoute, nodeRect, routeConnector, visibleWorldRect, toScreen,
   tableColumnEdges, TABLE_ROW_H,
   type Camera, type Point, type Rect,
 } from "@orim/editor";
@@ -24,6 +24,12 @@ export interface Scene {
   connectorSelection: ReadonlySet<NodeId>;
   editingId: NodeId | null;
   presences: PresenceState[];
+  /** Store revision, used to invalidate cached connector routes. */
+  revision: number;
+  /** Transient links (e.g. sticky ↔ source table row), drawn dashed. */
+  dataLinks: { a: Point; b: Point }[];
+  /** Frame timestamp; drives the data-link dash animation. */
+  timestamp?: number;
   marquee: Rect | null;
   draftRect: Rect | null;
   draftConnector: { from: Point; to: Point } | null;
@@ -43,6 +49,7 @@ export class Renderer {
   private dpr = 1;
   private wrapCache = new Map<NodeId, { key: string; lines: string[] }>();
   private inkCache = new Map<NodeId, { key: number; path: Path2D }>();
+  private routeCache = new Map<NodeId, { rev: number; route: Point[] | null }>();
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
@@ -125,7 +132,7 @@ export class Renderer {
           ctx.lineWidth = 1 / z;
           ctx.stroke();
           if (drawText && n.id !== scene.editingId && n.text) {
-            this.drawWrappedText(n.id, n.text, n, color.text, FONT_SIZE, false);
+            this.drawWrappedText(n.id, n.text, n, color.text, FONT_SIZE, true);
           }
           break;
         }
@@ -175,10 +182,53 @@ export class Renderer {
       }
     }
 
+    // Transient data-binding links: animated dashed curves with port dots,
+    // so a live binding reads as "plugged in", not as a drawn line.
+    if (scene.dataLinks.length) {
+      const t = (scene.timestamp ?? 0) / 40;
+      for (const link of scene.dataLinks) {
+        const dx = link.b.x - link.a.x;
+        const reach = Math.min(90, Math.max(28, Math.abs(dx) / 2));
+        const dir = dx >= 0 ? 1 : -1;
+        ctx.strokeStyle = "rgba(79, 124, 255, 0.65)";
+        ctx.lineWidth = 1.75 / z;
+        ctx.setLineDash([6 / z, 5 / z]);
+        ctx.lineDashOffset = -t / z;
+        ctx.beginPath();
+        ctx.moveTo(link.a.x, link.a.y);
+        ctx.bezierCurveTo(
+          link.a.x + dir * reach, link.a.y,
+          link.b.x - dir * reach, link.b.y,
+          link.b.x, link.b.y,
+        );
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+        // Port dots at both ends.
+        for (const p of [link.a, link.b]) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 4 / z, 0, Math.PI * 2);
+          ctx.fillStyle = "#4F7CFF";
+          ctx.fill();
+          ctx.lineWidth = 1.5 / z;
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.stroke();
+        }
+      }
+    }
+
     // Pass 3: connectors above content (like FigJam), so a short link
-    // between adjacent nodes never disappears behind them.
+    // between adjacent nodes never disappears behind them. Routes avoid
+    // crossing nodes; recomputed only when the board changes.
     for (const c of scene.connectors.values()) {
-      const route = connectorRoute(c, scene.getNode);
+      const cached = this.routeCache.get(c.id);
+      let route: Point[] | null;
+      if (cached && cached.rev === scene.revision) {
+        route = cached.route;
+      } else {
+        route = routeConnector(c, scene.getNode, scene.nodesSorted);
+        this.routeCache.set(c.id, { rev: scene.revision, route });
+      }
       if (!route || route.length < 2) continue;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const p of route) {

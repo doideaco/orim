@@ -10,6 +10,7 @@
     "@hocuspocus/provider": "^4.7.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@orim/convert": "workspace:*",
+    "@orim/editor": "workspace:*",
     "@orim/layout": "workspace:*",
     "@orim/schema": "workspace:*",
     "@orim/store": "workspace:*",

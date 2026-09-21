@@ -2,7 +2,7 @@ import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { IndexeddbPersistence } from "y-indexeddb";
 import { BoardStore } from "@orim/store";
-import type { PaletteColor } from "@orim/schema";
+import { cellSource, type PaletteColor } from "@orim/schema";
 import {
   Editor, cameraToFit, tableCellRect, toScreen, toWorld, zoomAt,
   type Camera, type ToolName,
@@ -53,7 +53,21 @@ const editor = new Editor(store, camera, {
     if (node.type === "frame") {
       openFrameTitleEditor(node);
     } else if (isEditable(node)) {
-      overlay.open(node, camera, (text) => store.updateNode(node.id, { text }));
+      overlay.open(node, camera, (text) => {
+        // A cell-bound node writes through to its source cell; the
+        // reconciler then updates every bound view of that cell.
+        const src = cellSource(node);
+        const table = src ? store.getNode(src.table) : undefined;
+        if (src && table?.type === "table") {
+          store.updateNode(src.table, {
+            rows: table.rows.map((r) =>
+              r.id === src.row ? { ...r, cells: { ...r.cells, [src.column]: text } } : r,
+            ),
+          });
+        } else {
+          store.updateNode(node.id, { text });
+        }
+      });
     }
     dirty = true;
   },
@@ -190,7 +204,57 @@ awareness?.on("change", () => {
 store.subscribe(() => {
   dirty = true;
   dataPanel.scheduleRefresh();
+  reconcileDerived();
 });
+
+/** Cell-bound nodes always show their source cell's current text. */
+let reconciling = false;
+function reconcileDerived(): void {
+  if (reconciling) return;
+  reconciling = true;
+  try {
+    const updates: [string, string][] = [];
+    for (const n of store.nodes.values()) {
+      const src = cellSource(n);
+      if (!src || !("text" in n)) continue;
+      const table = store.getNode(src.table);
+      if (table?.type !== "table") continue;
+      const row = table.rows.find((r) => r.id === src.row);
+      if (!row) continue;
+      const text = row.cells[src.column] ?? "";
+      if (text !== n.text) updates.push([n.id, text]);
+    }
+    if (updates.length) {
+      store.transact(() => {
+        for (const [id, text] of updates) store.updateNode(id, { text });
+      });
+    }
+  } finally {
+    reconciling = false;
+  }
+}
+
+/** Dashed setup links between selected bound nodes and their source rows. */
+function computeDataLinks(): { a: { x: number; y: number }; b: { x: number; y: number } }[] {
+  if (!editor.selection.size) return [];
+  const links: { a: { x: number; y: number }; b: { x: number; y: number } }[] = [];
+  for (const n of store.nodes.values()) {
+    const src = cellSource(n);
+    if (!src) continue;
+    if (!editor.selection.has(n.id) && !editor.selection.has(src.table)) continue;
+    const table = store.getNode(src.table);
+    if (table?.type !== "table") continue;
+    const rowIndex = table.rows.findIndex((r) => r.id === src.row);
+    if (rowIndex < 0) continue;
+    const rowY = table.y + (rowIndex + 1.5) * 34;
+    const nodeLeftOfTable = n.x + n.w < table.x;
+    links.push({
+      a: { x: nodeLeftOfTable ? table.x : table.x + table.w, y: rowY },
+      b: { x: nodeLeftOfTable ? n.x + n.w : n.x, y: n.y + n.h / 2 },
+    });
+  }
+  return links;
+}
 
 // --- pointer -----------------------------------------------------------------
 
@@ -521,7 +585,8 @@ let fpsWindowStart = performance.now();
 let lastMinimap = 0;
 
 function frame(): void {
-  if (dirty || presences.length > 0 || overlay.activeId) {
+  const dataLinks = computeDataLinks();
+  if (dirty || presences.length > 0 || overlay.activeId || dataLinks.length) {
     renderer.render({
       nodesSorted: store.nodesSorted,
       connectors: store.connectors,
@@ -531,6 +596,9 @@ function frame(): void {
       connectorSelection: editor.connectorSelection,
       editingId: overlay.activeId,
       presences,
+      revision: store.revision,
+      dataLinks,
+      timestamp: performance.now(),
       marquee: editor.marquee,
       draftRect: editor.draftRect,
       draftConnector: editor.draftConnector,

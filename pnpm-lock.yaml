@@ -26,6 +26,9 @@ importers:
       '@orim/convert':
         specifier: workspace:*
         version: link:../../packages/convert
+      '@orim/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
       '@orim/layout':
         specifier: workspace:*
         version: link:../../packages/layout
