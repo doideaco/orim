@@ -5,6 +5,7 @@ export * from "./order";
 export * from "./markdown";
 export * from "./mermaid";
 export * from "./svg";
+export * from "./import-grid";
 
 /** Board → the open Orim file format (schema-validated JSON shape). */
 export function boardToJSON(board: ExportBoard, id = "board"): BoardDoc {

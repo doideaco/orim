@@ -16,6 +16,7 @@ import {
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
 import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
+import { setupFileDrop } from "./import-drop";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
@@ -185,6 +186,28 @@ function openTableCellEditor(
     }
   });
 }
+
+// --- file drop → diagram -----------------------------------------------------
+
+let toastTimer: number | null = null;
+function toast(message: string, isError = false): void {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.toggle("error", isError);
+  el.classList.add("show");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => el.classList.remove("show"), 4200);
+}
+
+setupFileDrop({
+  store, editor, camera, newId,
+  onDone: (summary) => {
+    toast(summary);
+    dirty = true;
+    dataPanel.scheduleRefresh();
+  },
+  onError: (message) => toast(message, true),
+});
 
 // --- sync --------------------------------------------------------------------
 
