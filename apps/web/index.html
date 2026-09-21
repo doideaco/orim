@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orim</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f4f2;
+        --ink: #1f2430;
+        --panel: rgba(255, 255, 255, 0.94);
+        --border: rgba(0, 0, 0, 0.09);
+        --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        --accent: #4f7cff;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; }
+      body {
+        font-family: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      #canvas { position: fixed; inset: 0; touch-action: none; }
+      #overlay-root { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+
+      .panel {
+        position: fixed;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+      }
+
+      #toolbar {
+        left: 12px; top: 50%;
+        transform: translateY(-50%);
+        display: flex; flex-direction: column;
+        padding: 6px;
+        gap: 2px;
+        z-index: 10;
+      }
+      #toolbar button {
+        width: 38px; height: 38px;
+        display: grid; place-items: center;
+        border: none; border-radius: 8px;
+        background: transparent;
+        cursor: pointer;
+        color: #40444f;
+      }
+      #toolbar button:hover { background: rgba(0, 0, 0, 0.06); }
+      #toolbar button.active { background: var(--accent); color: #fff; }
+      #toolbar svg { width: 19px; height: 19px; display: block; }
+      #toolbar hr {
+        border: none; border-top: 1px solid var(--border);
+        margin: 4px 6px;
+      }
+      #colors {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 4px; padding: 4px 5px 2px;
+      }
+      #colors button {
+        width: 0; height: 0;
+        padding: 7px; border-radius: 50%;
+        border: 1.5px solid rgba(0, 0, 0, 0.12);
+        cursor: pointer;
+      }
+      #colors button.active { outline: 2px solid var(--accent); outline-offset: 1.5px; }
+
+      #zoombar {
+        right: 12px; bottom: 172px;
+        display: flex; align-items: center;
+        padding: 4px;
+        gap: 2px;
+        z-index: 10;
+        font-size: 12px;
+      }
+      #zoombar button {
+        font: inherit;
+        border: none; background: transparent;
+        border-radius: 6px;
+        padding: 6px 9px;
+        cursor: pointer;
+        color: #40444f;
+      }
+      #zoombar button:hover { background: rgba(0, 0, 0, 0.06); }
+      #zoom-label { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+
+      #minimap {
+        right: 12px; bottom: 12px;
+        z-index: 10;
+        overflow: hidden;
+        cursor: pointer;
+      }
+      #minimap canvas { display: block; }
+
+      #statusbar {
+        left: 12px; bottom: 12px;
+        z-index: 10;
+        padding: 6px 11px;
+        font-size: 11.5px;
+        color: #6b7280;
+        display: flex; align-items: center; gap: 8px;
+        user-select: none;
+      }
+      #status-dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: #d1d5db;
+      }
+      #status-dot.connected { background: #22c55e; }
+      #stat-fps { font-variant-numeric: tabular-nums; }
+
+      .orim-text-editor {
+        position: absolute;
+        pointer-events: auto;
+        transform-origin: top left;
+        border-radius: 6px;
+      }
+      .orim-text-editor .ProseMirror {
+        width: 100%; height: 100%;
+        padding: 12px;
+        outline: 2px solid var(--accent);
+        border-radius: 6px;
+        font-size: 15px;
+        line-height: 1.35;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: hidden;
+      }
+      .orim-text-editor .ProseMirror p { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="overlay-root"></div>
+
+    <div id="toolbar" class="panel">
+      <button data-tool="select" title="Select — V"></button>
+      <button data-tool="hand" title="Pan — H"></button>
+      <hr />
+      <button data-tool="sticky" title="Sticky note — N"></button>
+      <button data-tool="rect" title="Rectangle — R"></button>
+      <button data-tool="ellipse" title="Ellipse — O"></button>
+      <button data-tool="diamond" title="Diamond — D"></button>
+      <button data-tool="text" title="Text — T"></button>
+      <button data-tool="frame" title="Frame — F"></button>
+      <button data-tool="connector" title="Connector — C"></button>
+      <button data-tool="ink" title="Pen — P"></button>
+      <hr />
+      <div id="colors"></div>
+    </div>
+
+    <div id="zoombar" class="panel">
+      <button id="zoom-out" title="Zoom out">−</button>
+      <span id="zoom-label">100%</span>
+      <button id="zoom-in" title="Zoom in">+</button>
+      <button id="zoom-fit" title="Zoom to fit — 1">Fit</button>
+    </div>
+
+    <div id="minimap" class="panel"><canvas id="minimap-canvas" width="200" height="140"></canvas></div>
+
+    <div id="statusbar" class="panel">
+      <span id="status-dot"></span>
+      <span id="stat-conn">offline</span>
+      <span>·</span>
+      <span id="stat-fps">–</span><span>fps</span>
+      <span>·</span>
+      <span id="stat-nodes">0</span><span>objects</span>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -71,6 +71,87 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  apps/web:
+    dependencies:
+      '@hocuspocus/provider':
+        specifier: ^3.2.3
+        version: 3.4.4(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32)
+      '@orim/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
+      '@orim/renderer':
+        specifier: workspace:*
+        version: link:../../packages/renderer
+      '@orim/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      '@orim/store':
+        specifier: workspace:*
+        version: link:../../packages/store
+      lucide:
+        specifier: ^1.47.0
+        version: 1.47.0
+      prosemirror-commands:
+        specifier: ^1.6.0
+        version: 1.7.2
+      prosemirror-history:
+        specifier: ^1.4.0
+        version: 1.5.0
+      prosemirror-keymap:
+        specifier: ^1.2.0
+        version: 1.2.3
+      prosemirror-model:
+        specifier: ^1.23.0
+        version: 1.25.11
+      prosemirror-state:
+        specifier: ^1.4.0
+        version: 1.4.4
+      prosemirror-view:
+        specifier: ^1.34.0
+        version: 1.42.4
+      y-indexeddb:
+        specifier: ^9.0.12
+        version: 9.0.12(yjs@13.6.32)
+      yjs:
+        specifier: ^13.6.20
+        version: 13.6.32
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.6)(tsx@4.23.15)
+
+  packages/editor:
+    dependencies:
+      '@orim/schema':
+        specifier: workspace:*
+        version: link:../schema
+      '@orim/store':
+        specifier: workspace:*
+        version: link:../store
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
+  packages/renderer:
+    dependencies:
+      '@orim/editor':
+        specifier: workspace:*
+        version: link:../editor
+      '@orim/schema':
+        specifier: workspace:*
+        version: link:../schema
+      perfect-freehand:
+        specifier: ^1.2.2
+        version: 1.2.3
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   packages/schema:
     dependencies:
       zod:
@@ -635,6 +716,9 @@ packages:
     engines: {node: '>=16'}
     hasBin: true
 
+  lucide@1.47.0:
+    resolution: {integrity: sha512-gJoVJM5fvpBDGZTvhpJS9IEurz85HbD+wgOlCkXCIw35tHrqTxSdIYUN9sXvs7Aw3NCl67A+nlotNyoU4u7zOQ==}
+
   nanoid@3.3.19:
     resolution: {integrity: sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -642,6 +726,9 @@ packages:
 
   orderedmap@2.1.1:
     resolution: {integrity: sha512-TvAWxi0nDe1j/rtMcWcIj94+Ffe6n7zhow33h40SKxmsmozs6dz/e+EajymfoFcHd7sxNn8yHM8839uixMOV6g==}
+
+  perfect-freehand@1.2.3:
+    resolution: {integrity: sha512-bHZSfqDHGNlPpgH2yxXgPHlQSPpEbo+qg7li0M78J9vNAi2yjwLeA4x79BEQhX44lEWpCLSFCeRZwpw0niiXPA==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -765,6 +852,12 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+
+  y-indexeddb@9.0.12:
+    resolution: {integrity: sha512-9oCFRSPPzBK7/w5vOkJBaVCQZKHXB/v6SIT+WYhnJxlEC61juqG0hBrAf+y3gmSMLFLwICNH9nQ53uscuse6Hg==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
+    peerDependencies:
+      yjs: ^13.0.0
 
   y-protocols@1.0.7:
     resolution: {integrity: sha512-YSVsLoXxO67J6eE/nV4AtFtT3QEotZf5sK5BHxFBXso7VDUT3Tx07IfA6hsu5Q5OmBdMkQVmFZ9QOA7fikWvnw==}
@@ -1150,9 +1243,13 @@ snapshots:
     dependencies:
       isomorphic.js: 0.2.5
 
+  lucide@1.47.0: {}
+
   nanoid@3.3.19: {}
 
   orderedmap@2.1.1: {}
+
+  perfect-freehand@1.2.3: {}
 
   picocolors@1.1.1: {}
 
@@ -1280,6 +1377,11 @@ snapshots:
   w3c-keyname@2.2.8: {}
 
   ws@8.21.3: {}
+
+  y-indexeddb@9.0.12(yjs@13.6.32):
+    dependencies:
+      lib0: 0.2.117
+      yjs: 13.6.32
 
   y-protocols@1.0.7(yjs@13.6.32):
     dependencies:
