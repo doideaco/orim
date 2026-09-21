@@ -20,6 +20,7 @@ export interface EditorHooks {
   newId(): string;
   openTextEditor(node: Node): void;
   defaultColor(): PaletteColor;
+  defaultFillStyle(): ShapeNode["fillStyle"];
 }
 
 export interface PointerInfo {
@@ -340,10 +341,11 @@ export class Editor {
           return;
         }
         const node = this.makeNode({
-              type: "shape", ...box,
-              kind: SHAPE_TOOLS[this.tool] ?? "rect",
-              text: "", color: this.hooks.defaultColor(), fillStyle: "solid",
-            });
+          type: "shape", ...box,
+          kind: SHAPE_TOOLS[this.tool] ?? "rect",
+          text: "", color: this.hooks.defaultColor(),
+          fillStyle: this.hooks.defaultFillStyle(),
+        });
         this.selectOnly(node.id);
         this.tool = "select";
         return;
@@ -515,6 +517,15 @@ export class Editor {
         if (n && (n.type === "sticky" || n.type === "shape" || n.type === "ink")) {
           this.store.updateNode(id, { color });
         }
+      }
+    });
+  }
+
+  setSelectionFillStyle(fillStyle: ShapeNode["fillStyle"]): void {
+    this.store.transact(() => {
+      for (const id of this.selection) {
+        const n = this.store.getNode(id);
+        if (n && n.type === "shape") this.store.updateNode(id, { fillStyle });
       }
     });
   }

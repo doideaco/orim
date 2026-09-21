@@ -57,17 +57,59 @@
         border: none; border-top: 1px solid var(--border);
         margin: 4px 6px;
       }
-      #colors {
-        display: grid; grid-template-columns: repeat(3, 1fr);
-        gap: 4px; padding: 4px 5px 2px;
-      }
-      #colors button {
-        width: 0; height: 0;
-        padding: 7px; border-radius: 50%;
-        border: 1.5px solid rgba(0, 0, 0, 0.12);
+      #swatch {
+        width: 38px; height: 38px;
+        display: grid; place-items: center;
+        border: none; border-radius: 8px;
+        background: transparent;
         cursor: pointer;
       }
-      #colors button.active { outline: 2px solid var(--accent); outline-offset: 1.5px; }
+      #swatch:hover { background: rgba(0, 0, 0, 0.06); }
+      #swatch .chip {
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        border: 2.5px solid;
+      }
+
+      #color-popover {
+        position: fixed;
+        z-index: 20;
+        padding: 10px;
+        display: none;
+      }
+      #color-popover.open { display: block; }
+      #popover-swatches {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 7px;
+      }
+      #popover-swatches button {
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        border: 2px solid;
+        cursor: pointer;
+      }
+      #popover-swatches button.active { outline: 2px solid var(--accent); outline-offset: 2px; }
+      #popover-fillstyles {
+        display: flex; gap: 4px;
+        margin-top: 10px;
+        border-top: 1px solid var(--border);
+        padding-top: 10px;
+      }
+      #popover-fillstyles button {
+        flex: 1;
+        font: inherit; font-size: 11.5px;
+        padding: 4px 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fff;
+        color: #40444f;
+        cursor: pointer;
+      }
+      #popover-fillstyles button.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
 
       #zoombar {
         right: 12px; bottom: 172px;
@@ -97,12 +139,13 @@
       #minimap canvas { display: block; }
 
       #logo {
-        left: 12px; top: 12px;
+        position: fixed;
+        left: 18px; top: 16px;
+        height: 21px;
         z-index: 10;
-        padding: 9px 13px 7px;
         user-select: none;
+        pointer-events: none;
       }
-      #logo img { height: 15px; display: block; }
 
       #statusbar {
         left: 12px; bottom: 12px;
@@ -144,7 +187,7 @@
     <canvas id="canvas"></canvas>
     <div id="overlay-root"></div>
 
-    <div id="logo" class="panel"><img src="/orim.svg" alt="Orim" /></div>
+    <img id="logo" src="/orim.svg" alt="Orim" />
 
     <div id="toolbar" class="panel">
       <button data-tool="select" title="Select — V"></button>
@@ -159,7 +202,12 @@
       <button data-tool="connector" title="Connector — C"></button>
       <button data-tool="ink" title="Pen — P"></button>
       <hr />
-      <div id="colors"></div>
+      <button id="swatch" title="Fill & stroke"><span class="chip"></span></button>
+    </div>
+
+    <div id="color-popover" class="panel">
+      <div id="popover-swatches"></div>
+      <div id="popover-fillstyles"></div>
     </div>
 
     <div id="zoombar" class="panel">

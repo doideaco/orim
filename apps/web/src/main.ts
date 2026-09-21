@@ -26,6 +26,7 @@ const store = new BoardStore(doc);
 const camera: Camera = { x: -80, y: -80, zoom: 1 };
 let presences: PresenceState[] = [];
 let defaultColor: PaletteColor = "yellow";
+let defaultFillStyle: "solid" | "outline" | "none" = "solid";
 let dirty = true;
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -41,6 +42,7 @@ const newId = () =>
 const editor = new Editor(store, camera, {
   newId,
   defaultColor: () => defaultColor,
+  defaultFillStyle: () => defaultFillStyle,
   openTextEditor: (node) => {
     if (node.type === "frame") {
       openFrameTitleEditor(node);
@@ -256,20 +258,71 @@ function syncToolbar(): void {
   }
 }
 
-const colorsEl = $("colors");
+// One swatch shows the active fill + stroke; clicking opens the popover.
+const swatchBtn = $("swatch");
+const swatchChip = swatchBtn.querySelector(".chip") as HTMLElement;
+const popover = $("color-popover");
+const swatchesEl = $("popover-swatches");
+const fillStylesEl = $("popover-fillstyles");
+
+function refreshSwatchUI(): void {
+  const c = PALETTE[defaultColor];
+  swatchChip.style.background =
+    defaultFillStyle === "solid" ? c.fill : defaultFillStyle === "outline" ? "#fff" : "transparent";
+  swatchChip.style.borderColor = defaultFillStyle === "outline" ? c.solid : c.edge;
+  for (const b of swatchesEl.children) {
+    b.classList.toggle("active", (b as HTMLElement).dataset.color === defaultColor);
+  }
+  for (const b of fillStylesEl.children) {
+    b.classList.toggle("active", (b as HTMLElement).dataset.fill === defaultFillStyle);
+  }
+}
+
 for (const key of PALETTE_KEYS) {
   const btn = document.createElement("button");
-  btn.style.background = PALETTE[key].fill;
+  btn.dataset.color = key;
   btn.title = key;
-  btn.classList.toggle("active", key === defaultColor);
+  btn.style.background = PALETTE[key].fill;
+  btn.style.borderColor = PALETTE[key].edge;
   btn.addEventListener("click", () => {
     defaultColor = key;
-    for (const b of colorsEl.children) b.classList.toggle("active", b === btn);
     editor.setSelectionColor(key);
+    refreshSwatchUI();
     dirty = true;
   });
-  colorsEl.appendChild(btn);
+  swatchesEl.appendChild(btn);
 }
+
+for (const fill of ["solid", "outline", "none"] as const) {
+  const btn = document.createElement("button");
+  btn.dataset.fill = fill;
+  btn.textContent = fill[0]!.toUpperCase() + fill.slice(1);
+  btn.addEventListener("click", () => {
+    defaultFillStyle = fill;
+    editor.setSelectionFillStyle(fill);
+    refreshSwatchUI();
+    dirty = true;
+  });
+  fillStylesEl.appendChild(btn);
+}
+
+swatchBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const willOpen = !popover.classList.contains("open");
+  popover.classList.toggle("open", willOpen);
+  if (willOpen) {
+    const r = swatchBtn.getBoundingClientRect();
+    popover.style.left = `${r.right + 10}px`;
+    popover.style.top = `${Math.min(r.top, window.innerHeight - 180)}px`;
+  }
+});
+window.addEventListener("pointerdown", (e) => {
+  if (!popover.contains(e.target as globalThis.Node) && e.target !== swatchBtn) {
+    popover.classList.remove("open");
+  }
+});
+
+refreshSwatchUI();
 
 // --- zoom & minimap ----------------------------------------------------------
 
