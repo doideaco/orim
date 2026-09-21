@@ -191,7 +191,7 @@ export interface BuiltImport {
   nodes: Node[];
   connectors: Connector[];
   /** ELK direction when the result needs auto-layout. */
-  layout: "RIGHT" | "DOWN" | null;
+  layout: "RIGHT" | "DOWN" | "LEFT" | "UP" | null;
   summary: string;
 }
 

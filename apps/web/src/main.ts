@@ -16,7 +16,7 @@ import {
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
 import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
-import { setupFileDrop } from "./import-drop";
+import { ORIM_CLIP_MARKER, setupFileDrop, setupPaste } from "./import-drop";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
@@ -199,14 +199,31 @@ function toast(message: string, isError = false): void {
   toastTimer = window.setTimeout(() => el.classList.remove("show"), 4200);
 }
 
-setupFileDrop({
+const importDeps = {
   store, editor, camera, newId,
-  onDone: (summary) => {
+  onDone: (summary: string) => {
     toast(summary);
     dirty = true;
     dataPanel.scheduleRefresh();
   },
-  onError: (message) => toast(message, true),
+  onError: (message: string) => toast(message, true),
+};
+setupFileDrop(importDeps);
+setupPaste({
+  ...importDeps,
+  isEditing: () => {
+    if (overlay.activeId) return true;
+    const t = document.activeElement;
+    return (
+      t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement ||
+      (t instanceof HTMLElement && t.isContentEditable)
+    );
+  },
+  internalPaste: () => {
+    editor.paste();
+    dirty = true;
+    dataPanel.scheduleRefresh();
+  },
 });
 
 // --- sync --------------------------------------------------------------------
@@ -382,9 +399,8 @@ window.addEventListener("keydown", (e) => {
     } else if (key === "c") {
       e.preventDefault();
       editor.copySelection();
-    } else if (key === "v") {
-      e.preventDefault();
-      editor.paste();
+      // Mark the system clipboard so paste knows to use the internal buffer.
+      void navigator.clipboard?.writeText(ORIM_CLIP_MARKER).catch(() => {});
     } else if (key === "d") {
       e.preventDefault();
       editor.duplicateSelection();

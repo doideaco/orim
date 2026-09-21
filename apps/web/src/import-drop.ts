@@ -6,7 +6,9 @@
  */
 import type { Node } from "@orim/schema";
 import {
-  buildFromGrid, inferPlan, parseDelimited, toGrid, type ImportedGrid,
+  buildFromGrid, buildFromMarkdown, buildFromMermaid, buildFromPlainText,
+  detectPaste, inferPlan, parseDelimited, textToGrid, toGrid,
+  type BuiltImport, type ImportedGrid,
 } from "@orim/convert";
 import { cameraToFit, toWorld, type Camera, type Editor } from "@orim/editor";
 import { layered } from "@orim/layout";
@@ -41,8 +43,36 @@ async function gridFromFile(file: File): Promise<ImportedGrid | null> {
   return null;
 }
 
-export function setupFileDrop(deps: DropDeps): void {
+async function insertBuilt(deps: DropDeps, built: BuiltImport, sourceLabel: string): Promise<void> {
   const { store, editor, camera } = deps;
+  if (built.layout) {
+    const positions = await layered(built.nodes, built.connectors, {
+      direction: built.layout,
+      spacing: 40,
+    });
+    for (const n of built.nodes) {
+      const p = positions.get(n.id);
+      if (p) {
+        n.x = p.x;
+        n.y = p.y;
+      }
+    }
+  }
+  store.transact(() => {
+    for (const n of built.nodes) store.upsertNode(n);
+    for (const c of built.connectors) store.upsertConnector(c);
+  });
+  editor.clearSelection();
+  for (const n of built.nodes) editor.selection.add(n.id);
+  const bounds = boundsOf(built.nodes);
+  if (bounds) {
+    Object.assign(camera, cameraToFit(bounds, window.innerWidth, window.innerHeight, 96));
+  }
+  deps.onDone(`${sourceLabel} → ${built.summary}`);
+}
+
+export function setupFileDrop(deps: DropDeps): void {
+  const { store, camera } = deps;
 
   window.addEventListener("dragover", (e) => {
     if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
@@ -60,43 +90,61 @@ export function setupFileDrop(deps: DropDeps): void {
           deps.onError(`Couldn't read ${file.name} — drop a CSV, TSV or Excel file.`);
           return;
         }
-        const plan = inferPlan(grid);
-        const built = buildFromGrid(grid, plan, {
+        const built = buildFromGrid(grid, inferPlan(grid), {
           newId: deps.newId,
           origin,
           index: store.topIndex(),
           title: file.name.replace(/\.[^.]+$/, ""),
         });
-
-        if (built.layout) {
-          const positions = await layered(built.nodes, built.connectors, {
-            direction: built.layout,
-            spacing: 40,
-          });
-          for (const n of built.nodes) {
-            const p = positions.get(n.id);
-            if (p) {
-              n.x = p.x;
-              n.y = p.y;
-            }
-          }
-        }
-
-        store.transact(() => {
-          for (const n of built.nodes) store.upsertNode(n);
-          for (const c of built.connectors) store.upsertConnector(c);
-        });
-
-        editor.clearSelection();
-        for (const n of built.nodes) editor.selection.add(n.id);
-        const bounds = boundsOf(built.nodes);
-        if (bounds) {
-          Object.assign(camera, cameraToFit(bounds, window.innerWidth, window.innerHeight, 96));
-        }
-        deps.onDone(`${file.name} → ${built.summary}`);
+        await insertBuilt(deps, built, file.name);
       } catch (err) {
         console.error("import failed", err);
         deps.onError(`Import of ${file.name} failed: ${err instanceof Error ? err.message : err}`);
+      }
+    })();
+  });
+}
+
+/** Marker written to the system clipboard when board objects are copied,
+ *  so paste can tell internal object-paste from external content. */
+export const ORIM_CLIP_MARKER = "‹orim-internal-clipboard›";
+
+export function setupPaste(
+  deps: DropDeps & { isEditing(): boolean; internalPaste(): void },
+): void {
+  const { store, camera } = deps;
+  window.addEventListener("paste", (e) => {
+    if (deps.isEditing()) return;
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    e.preventDefault();
+    if (!text.trim() || text === ORIM_CLIP_MARKER) {
+      deps.internalPaste();
+      return;
+    }
+    void (async () => {
+      try {
+        const origin = toWorld(camera, {
+          x: window.innerWidth / 2 - 200,
+          y: window.innerHeight / 2 - 150,
+        });
+        const opts = { newId: deps.newId, origin, index: store.topIndex() };
+        const kind = detectPaste(text);
+        let built: BuiltImport | null = null;
+        if (kind === "mermaid") built = buildFromMermaid(text, opts);
+        if (!built && kind === "grid") {
+          const grid = textToGrid(text);
+          if (grid.headers.length >= 2 && grid.rows.length >= 1) {
+            built = buildFromGrid(grid, inferPlan(grid), { ...opts, title: "Pasted data" });
+          }
+        }
+        if (!built && (kind === "markdown" || kind === "mermaid")) {
+          built = buildFromMarkdown(text, opts);
+        }
+        if (!built) built = buildFromPlainText(text, opts);
+        await insertBuilt(deps, built, "Pasted");
+      } catch (err) {
+        console.error("paste import failed", err);
+        deps.onError(`Paste failed: ${err instanceof Error ? err.message : err}`);
       }
     })();
   });
