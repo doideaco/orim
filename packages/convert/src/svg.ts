@@ -104,17 +104,6 @@ export function boardToSVG(board: ExportBoard): string {
     parts.push(`<text x="${n.x + 1}" y="${n.y - 8}" font-family="${FONT}" font-size="13" font-weight="600" fill="#6B7280">${esc(n.title)}</text>`);
   }
 
-  // Connectors under content.
-  for (const c of board.connectors) {
-    const route = connectorRoute(c as Connector, getNode);
-    if (!route || route.length < 2) continue;
-    parts.push(`<path d="${pathFrom(route)}" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />`);
-    const last = route[route.length - 1]!;
-    const beforeLast = route[route.length - 2]!;
-    if (c.style === "arrow" || c.style === "double") parts.push(arrowhead(beforeLast, last, "#6B7280"));
-    if (c.style === "double") parts.push(arrowhead(route[1]!, route[0]!, "#6B7280"));
-  }
-
   for (const n of zSorted) {
     switch (n.type) {
       case "sticky": {
@@ -155,6 +144,42 @@ export function boardToSVG(board: ExportBoard): string {
         }
         break;
       }
+    }
+  }
+
+  // Connectors above content, matching the canvas renderer.
+  for (const c of board.connectors) {
+    const route = connectorRoute(c as Connector, getNode);
+    if (!route || route.length < 2) continue;
+    parts.push(`<path d="${pathFrom(route)}" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />`);
+    const last = route[route.length - 1]!;
+    const beforeLast = route[route.length - 2]!;
+    if (c.style === "arrow" || c.style === "double") parts.push(arrowhead(beforeLast, last, "#6B7280"));
+    if (c.style === "double") parts.push(arrowhead(route[1]!, route[0]!, "#6B7280"));
+    if (c.label) {
+      let total = 0;
+      const lens: number[] = [];
+      for (let i = 0; i < route.length - 1; i++) {
+        const l = Math.hypot(route[i + 1]!.x - route[i]!.x, route[i + 1]!.y - route[i]!.y);
+        lens.push(l);
+        total += l;
+      }
+      let remaining = total / 2;
+      let mid = route[0]!;
+      for (let i = 0; i < lens.length; i++) {
+        if (remaining <= lens[i]!) {
+          const t = lens[i]! ? remaining / lens[i]! : 0;
+          mid = {
+            x: route[i]!.x + (route[i + 1]!.x - route[i]!.x) * t,
+            y: route[i]!.y + (route[i + 1]!.y - route[i]!.y) * t,
+          };
+          break;
+        }
+        remaining -= lens[i]!;
+      }
+      const tw = c.label.length * 12 * CHAR_W;
+      parts.push(`<rect x="${mid.x - tw / 2 - 6}" y="${mid.y - 9}" width="${tw + 12}" height="18" rx="9" fill="#FFFFFF" stroke="rgba(0,0,0,0.10)" />`);
+      parts.push(`<text x="${mid.x}" y="${mid.y + 4}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="500" fill="#4B5563">${esc(c.label)}</text>`);
     }
   }
 

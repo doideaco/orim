@@ -130,7 +130,7 @@ server.tool(
 
 server.tool(
   "create_objects",
-  "Create nodes and/or connectors on a board. Everyone viewing the board sees them appear live. Connector endpoints reference node ids (existing ones, or by array position via $0, $1, … for nodes created in this same call).",
+  "Create nodes and/or connectors on a board. Everyone viewing the board sees them appear live. Connector endpoints reference node ids (existing ones, or by array position via $0, $1, … for nodes created in this same call). Read the board first and place new objects in EMPTY space — never overlapping existing content. Leave breathing room: at least 60 units between connected nodes so connectors and labels stay readable, and make frames comfortably larger than their contents.",
   {
     board: boardArg,
     nodes: z.array(CreateNode).default([]),

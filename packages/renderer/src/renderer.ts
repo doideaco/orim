@@ -99,22 +99,7 @@ export class Renderer {
       }
     }
 
-    // Pass 2: connectors (under nodes, over frames).
-    for (const c of scene.connectors.values()) {
-      const route = connectorRoute(c, scene.getNode);
-      if (!route || route.length < 2) continue;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const p of route) {
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-      }
-      if (!inView({ x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 })) continue;
-      const selected = scene.connectorSelection.has(c.id);
-      this.drawConnector(route, c.style, selected ? SELECTION_COLOR : "#6B7280", 2 / z);
-      if (c.label && drawText) this.connectorLabel(route, c.label);
-    }
-
-    // Pass 3: content nodes in z-order.
+    // Pass 2: content nodes in z-order.
     for (const n of scene.nodesSorted) {
       if (n.type === "frame" || !inView(n)) continue;
       visible++;
@@ -180,6 +165,22 @@ export class Renderer {
         ctx.lineWidth = 2 / z;
         ctx.strokeRect(n.x - 2 / z, n.y - 2 / z, n.w + 4 / z, n.h + 4 / z);
       }
+    }
+
+    // Pass 3: connectors above content (like FigJam), so a short link
+    // between adjacent nodes never disappears behind them.
+    for (const c of scene.connectors.values()) {
+      const route = connectorRoute(c, scene.getNode);
+      if (!route || route.length < 2) continue;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of route) {
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+      }
+      if (!inView({ x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 })) continue;
+      const selected = scene.connectorSelection.has(c.id);
+      this.drawConnector(route, c.style, selected ? SELECTION_COLOR : "#6B7280", 2 / z);
+      if (c.label && drawText) this.connectorLabel(route, c.label);
     }
 
     // Resize handles for single selection.
@@ -408,10 +409,13 @@ export class Renderer {
     }
     ctx.font = `500 12px ${FONT_STACK}`;
     const tw = ctx.measureText(label).width;
-    ctx.fillStyle = CANVAS_BG;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.10)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(mid.x - tw / 2 - 6, mid.y - 9, tw + 12, 18, 9);
     ctx.fill();
+    ctx.stroke();
     ctx.fillStyle = "#4B5563";
     ctx.textBaseline = "middle";
     ctx.fillText(label, mid.x - tw / 2, mid.y + 1);

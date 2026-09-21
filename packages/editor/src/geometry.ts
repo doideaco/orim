@@ -94,10 +94,29 @@ export function elbowRoute(
 ): Point[] {
   const fs = fromSide ?? dominantSide(from, to);
   const ts = toSide ?? dominantSide(to, from);
-  const p1 = { x: from.x + SIDE_VEC[fs].x * stub, y: from.y + SIDE_VEC[fs].y * stub };
-  const p2 = { x: to.x + SIDE_VEC[ts].x * stub, y: to.y + SIDE_VEC[ts].y * stub };
   const fh = fs === "e" || fs === "w";
   const th = ts === "e" || ts === "w";
+
+  // Endpoints facing each other across a small gap: shrink the stubs so the
+  // route doesn't wiggle, and go straight when they're basically aligned.
+  let stubF = stub;
+  let stubT = stub;
+  if (fh && th && fs !== ts) {
+    const gap = fs === "e" ? to.x - from.x : from.x - to.x;
+    if (gap > 0 && gap < stub * 2) {
+      if (Math.abs(from.y - to.y) < 8) return [from, to];
+      stubF = stubT = Math.max(6, gap / 2);
+    }
+  } else if (!fh && !th && fs !== ts) {
+    const gap = fs === "s" ? to.y - from.y : from.y - to.y;
+    if (gap > 0 && gap < stub * 2) {
+      if (Math.abs(from.x - to.x) < 8) return [from, to];
+      stubF = stubT = Math.max(6, gap / 2);
+    }
+  }
+
+  const p1 = { x: from.x + SIDE_VEC[fs].x * stubF, y: from.y + SIDE_VEC[fs].y * stubF };
+  const p2 = { x: to.x + SIDE_VEC[ts].x * stubT, y: to.y + SIDE_VEC[ts].y * stubT };
 
   let mids: Point[];
   if (fh && th) {
