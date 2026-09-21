@@ -408,7 +408,7 @@ export class Editor {
   dblClick(info: PointerInfo): void {
     if (this.tool !== "select") return;
     const hit = this.hitNode(info.world);
-    if (hit && (hit.type === "sticky" || hit.type === "shape" || hit.type === "text")) {
+    if (hit && (hit.type === "sticky" || hit.type === "shape" || hit.type === "text" || hit.type === "frame")) {
       this.selectOnly(hit.id);
       this.hooks.openTextEditor(hit);
     } else if (!hit) {

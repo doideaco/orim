@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hocuspocus/provider": "^3.2.3",
+    "@hocuspocus/provider": "^4.7.0",
     "@orim/editor": "workspace:*",
     "@orim/renderer": "workspace:*",
     "@orim/schema": "workspace:*",

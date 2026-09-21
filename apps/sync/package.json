@@ -3,11 +3,12 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "node --import tsx src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hocuspocus/server": "^3.2.3"
+    "@hocuspocus/extension-database": "^4.7.0",
+    "@hocuspocus/server": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^24",

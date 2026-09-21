@@ -9,14 +9,22 @@ The open, structured, agent-native visual canvas. See [PLAN.md](PLAN.md) for the
 - `apps/sync` — Hocuspocus WebSocket sync server (in-memory for now).
 - `apps/spike` — Phase 0 spike app: renderer perf, multiplayer, text-overlay glue.
 
-## Run the spike
+- `apps/web` — the editor app (toolbar, shortcuts, minimap, offline persistence).
+
+## Run
+
+Requires Node ≥ 22.5 (the sync server uses built-in `node:sqlite`).
 
 ```bash
 pnpm install
-pnpm --dir apps/sync dev    # ws://localhost:1234
-pnpm --dir apps/spike dev   # http://localhost:5180
+pnpm --dir apps/sync dev    # ws://localhost:1234, boards persisted to apps/sync/.data
+pnpm --dir apps/web dev     # http://localhost:5181
 ```
 
-Open two browser tabs at `localhost:5180` to see multiplayer. Double-click to create a
-sticky, double-click a sticky to edit, wheel to pan, ⌘/ctrl+wheel to zoom, "Seed 10k"
-to stress the renderer.
+Open two browser tabs at `localhost:5181` to see multiplayer; `?b=<name>` in the URL
+picks a board, so a link is a share link. Boards also live in IndexedDB, so the app
+works fully offline and re-syncs when the server is back.
+
+Tools: V select · H hand · N sticky · R/O/D shapes · T text · F frame · C connector ·
+P pen. ⌘Z undo, ⌘C/⌘V/⌘D copy/paste/duplicate, 1 zoom-to-fit, 0 reset zoom.
+`apps/spike` (port 5180) is the original Phase 0 spike, kept for perf benchmarking.

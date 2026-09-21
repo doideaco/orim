@@ -74,6 +74,7 @@ export class Renderer {
     );
 
     const view = visibleWorldRect(camera, this.width, this.height);
+    this.drawGrid(view, z);
     const drawText = z >= TEXT_ZOOM_MIN;
     const drawDetail = z >= DETAIL_ZOOM_MIN;
     let visible = 0;
@@ -291,6 +292,45 @@ export class Renderer {
   }
 
   // --- internals -------------------------------------------------------------
+
+  /**
+   * Subtle dot grid. Spacing doubles/halves with zoom so on-screen dot
+   * distance stays in a comfortable band, with the next-finer level fading
+   * in as you zoom — no popping.
+   */
+  private drawGrid(
+    view: { minX: number; minY: number; maxX: number; maxY: number },
+    z: number,
+  ): void {
+    const { ctx } = this;
+    const BASE = 32; // world units at 100%
+    const TARGET_MIN = 22; // px between dots before we coarsen
+
+    let spacing = BASE;
+    while (spacing * z < TARGET_MIN) spacing *= 2;
+    while (spacing * z >= TARGET_MIN * 2) spacing /= 2;
+
+    // 0 → this level barely arrived, 1 → about to subdivide.
+    const t = spacing * z / TARGET_MIN - 1;
+    const r = 1.1 / z; // ~1.1px dots on screen
+
+    const drawLevel = (step: number, alpha: number) => {
+      if (alpha <= 0.004) return;
+      ctx.fillStyle = `rgba(31, 36, 48, ${alpha})`;
+      const x0 = Math.floor(view.minX / step) * step;
+      const y0 = Math.floor(view.minY / step) * step;
+      ctx.beginPath();
+      for (let x = x0; x <= view.maxX; x += step) {
+        for (let y = y0; y <= view.maxY; y += step) {
+          ctx.rect(x - r, y - r, r * 2, r * 2);
+        }
+      }
+      ctx.fill();
+    };
+
+    drawLevel(spacing * 2, 0.13); // coarse level, always steady
+    drawLevel(spacing, 0.03 + 0.10 * t); // fine level fades in
+  }
 
   private path(n: { x: number; y: number; w: number; h: number }, kind: string, radius: number): void {
     const { ctx } = this;

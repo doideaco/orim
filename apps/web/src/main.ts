@@ -4,7 +4,7 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { BoardStore } from "@orim/store";
 import type { PaletteColor } from "@orim/schema";
 import {
-  Editor, cameraToFit, toWorld, zoomAt, type Camera, type ToolName,
+  Editor, cameraToFit, toScreen, toWorld, zoomAt, type Camera, type ToolName,
 } from "@orim/editor";
 import {
   Renderer, PALETTE, PALETTE_KEYS, CURSOR_COLORS, type PresenceState,
@@ -15,7 +15,8 @@ import {
   Type, Frame, MoveUpRight, Pencil, type IconNode,
 } from "lucide";
 
-const BOARD = "orim-main";
+// Board id comes from the URL (?b=my-board), so a link IS a share link.
+const BOARD = `orim-${new URLSearchParams(location.search).get("b") ?? "main"}`;
 
 // --- state -------------------------------------------------------------------
 
@@ -41,11 +42,40 @@ const editor = new Editor(store, camera, {
   newId,
   defaultColor: () => defaultColor,
   openTextEditor: (node) => {
-    if (!isEditable(node)) return;
-    overlay.open(node, camera, (text) => store.updateNode(node.id, { text }));
+    if (node.type === "frame") {
+      openFrameTitleEditor(node);
+    } else if (isEditable(node)) {
+      overlay.open(node, camera, (text) => store.updateNode(node.id, { text }));
+    }
     dirty = true;
   },
 });
+
+function openFrameTitleEditor(frame: { id: string; x: number; y: number; title: string }): void {
+  const s = toScreen(camera, { x: frame.x, y: frame.y - 26 / camera.zoom });
+  const input = document.createElement("input");
+  input.value = frame.title;
+  input.style.cssText = `position:absolute; left:${s.x}px; top:${s.y}px; width:220px;
+    pointer-events:auto; font:600 13px -apple-system,system-ui,sans-serif; color:#374151;
+    padding:2px 6px; border:none; border-radius:5px; outline:2px solid var(--accent); background:#fff;`;
+  document.getElementById("overlay-root")!.appendChild(input);
+  input.focus();
+  input.select();
+  const commit = () => {
+    if (input.value.trim()) store.updateNode(frame.id, { title: input.value.trim() });
+    input.remove();
+    dirty = true;
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") {
+      input.value = frame.title;
+      input.blur();
+    }
+  });
+}
 
 // --- sync --------------------------------------------------------------------
 
