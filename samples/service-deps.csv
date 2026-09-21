@@ -1,0 +1,11 @@
+From,To,Label
+frontend,api gateway,https
+api gateway,auth service,
+api gateway,billing,
+api gateway,search,
+auth service,user db,
+billing,payment provider,stripe
+billing,email worker,receipts
+search,search index,
+email worker,smtp relay,
+frontend,cdn,assets

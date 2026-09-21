@@ -1,0 +1,13 @@
+Name,Role,Manager
+Dana,CEO,
+Alex,VP Product,Dana
+Sam,VP Engineering,Dana
+Priya,VP Sales,Dana
+Rae,Design Lead,Alex
+Kit,Product Manager,Alex
+Jo,Backend Engineer,Sam
+Ash,Frontend Engineer,Sam
+Lee,Infrastructure,Sam
+Mia,Account Exec,Priya
+Tom,Account Exec,Priya
+Noor,SDR,Priya

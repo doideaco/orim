@@ -1,0 +1,7 @@
+Feature,Owner,Notes,Priority
+"Exports, incl. PDF",Sam,"Users said: ""we need this yesterday""",High
+Realtime cursors,Rae,"Works, but flickers
+on slow networks",Low
+"Tables, sorting & filters",Alex,"Blocked on schema, see PLAN.md",High
+Mermaid import,Kit,,Low
+"Offline mode ""local-first""",Jo,Ship with sync server v2,High
