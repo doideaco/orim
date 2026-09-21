@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "spike",
+      "runtimeExecutable": "/Users/alexmorris/.volta/bin/pnpm",
+      "runtimeArgs": ["--dir", "apps/spike", "dev"],
+      "port": 5180
+    }
+  ]
+}
