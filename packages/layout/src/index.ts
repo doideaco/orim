@@ -9,6 +9,8 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { Connector, Node } from "@orim/schema";
 
+export * from "./synthesize";
+
 export interface Position {
   x: number;
   y: number;

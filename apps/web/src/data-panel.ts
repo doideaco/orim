@@ -4,7 +4,10 @@
  * accessibility tree use) plus an inspector for the selected object,
  * including its free-form `data` bag. Click a row to select and jump to it.
  */
-import { cellSource, type Connector, type Node } from "@orim/schema";
+import {
+  cellSource, type Connector, type FrameNode, type Node, type StickyNode,
+} from "@orim/schema";
+import { findEmptySpace, synthesizeTable } from "@orim/layout";
 import { orderBoard, nodeLabel, type ExportBoard } from "@orim/convert";
 import { PALETTE } from "@orim/renderer";
 import type { BoardStore } from "@orim/store";
@@ -146,6 +149,82 @@ export class DataPanel {
     }
   }
 
+  /** Multi-selection: counts + cluster synthesis. */
+  private renderMultiInspector(): void {
+    this.inspector.replaceChildren();
+    const selected = [...this.editor.selection]
+      .map((id) => this.store.getNode(id))
+      .filter((n): n is Node => !!n);
+    const summary = document.createElement("div");
+    summary.className = "empty";
+    summary.textContent = `${selected.length} objects selected`;
+    this.inspector.appendChild(summary);
+
+    const stickies = selected.filter(
+      (n): n is StickyNode => n.type === "sticky" && !cellSource(n),
+    );
+    if (stickies.length < 2) return;
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const b = document.createElement("button");
+    b.textContent = `Stickies → table (${stickies.length})`;
+    b.addEventListener("click", () => {
+      this.synthesize(stickies);
+      this.onChange();
+      this.scheduleRefresh();
+    });
+    actions.appendChild(b);
+    this.inspector.appendChild(actions);
+  }
+
+  /** Spatial clusters of the given stickies become a table; each sticky
+   *  becomes a live view of its row. */
+  private synthesize(stickies: StickyNode[]): void {
+    const frames = [...this.store.nodes.values()].filter(
+      (n): n is FrameNode => n.type === "frame",
+    );
+    const { columns, rows, bindings } = synthesizeTable(stickies, frames);
+    if (!rows.length) return;
+
+    const w = columns.reduce((s, c) => s + c.w, 0);
+    const h = (rows.length + 1) * 34;
+    const right = Math.max(...stickies.map((s) => s.x + s.w));
+    const top = Math.min(...stickies.map((s) => s.y));
+    const pos = findEmptySpace(
+      [...this.store.nodes.values()],
+      w, h,
+      { x: right + 120, y: top },
+    );
+
+    const tableId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    this.store.transact(() => {
+      this.store.upsertNode({
+        id: tableId,
+        type: "table",
+        parent: null,
+        x: pos.x, y: pos.y, w, h,
+        rotation: 0,
+        index: this.store.topIndex(),
+        locked: false,
+        data: {},
+        title: "Synthesis",
+        columns,
+        rows,
+      });
+      for (const b of bindings) {
+        const sticky = this.store.getNode(b.stickyId);
+        if (!sticky) continue;
+        this.store.updateNode(b.stickyId, {
+          data: { ...sticky.data, $source: { table: tableId, row: b.rowId, column: b.columnId } },
+        });
+      }
+    });
+    this.editor.selectOnly(tableId);
+    const table = this.store.getNode(tableId);
+    if (table) this.jumpTo(table);
+  }
+
   private renderTableActions(table: Extract<Node, { type: "table" }>): void {
     const actions = document.createElement("div");
     actions.className = "actions";
@@ -221,7 +300,11 @@ export class DataPanel {
   private renderInspector(): void {
     const node = this.editor.singleSelectedNode();
     if (!node) {
-      this.inspector.innerHTML = `<div class="empty">Select an object to inspect it.</div>`;
+      if (this.editor.selection.size > 1) {
+        this.renderMultiInspector();
+      } else {
+        this.inspector.innerHTML = `<div class="empty">Select an object to inspect it.</div>`;
+      }
       return;
     }
     this.inspector.replaceChildren();

@@ -12,6 +12,7 @@
     "@hocuspocus/provider": "^4.7.0",
     "@orim/convert": "workspace:*",
     "@orim/editor": "workspace:*",
+    "@orim/layout": "workspace:*",
     "@orim/renderer": "workspace:*",
     "@orim/schema": "workspace:*",
     "@orim/store": "workspace:*",

@@ -131,6 +131,9 @@ importers:
       '@orim/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@orim/layout':
+        specifier: workspace:*
+        version: link:../../packages/layout
       '@orim/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer

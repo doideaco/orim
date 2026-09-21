@@ -11,8 +11,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import type { Connector, Endpoint, Node, PaletteColor } from "@orim/schema";
+import { cellSource, type FrameNode, type StickyNode } from "@orim/schema";
 import { boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG } from "@orim/convert";
-import { findEmptySpace, grid, layered } from "@orim/layout";
+import { findEmptySpace, grid, layered, synthesizeTable } from "@orim/layout";
 import { docName, openBoard, settle, toExportBoard } from "./boards";
 
 const DB_PATH =
@@ -311,6 +312,54 @@ server.tool(
     });
     await settle();
     return text(`Rearranged ${positions.size} node(s) with ${algorithm} layout.`);
+  },
+);
+
+server.tool(
+  "synthesize_table",
+  "Cluster synthesis: turn stickies into a structured table. Spatial clusters become the Cluster column (a cluster inside one frame takes the frame's title), each sticky becomes a row, and every sticky is bound as a live view of its row — cell edits update the sticky and vice versa. Defaults to all unbound stickies; pass node_ids for a subset.",
+  {
+    board: boardArg,
+    node_ids: z.array(z.string()).optional(),
+    title: z.string().default("Synthesis"),
+  },
+  async ({ board, node_ids, title }) => {
+    const { store } = await openBoard(board);
+    const stickies = (node_ids ?? [...store.nodes.keys()])
+      .map((id) => store.getNode(id))
+      .filter((n): n is StickyNode => n?.type === "sticky" && !cellSource(n));
+    if (stickies.length < 2) return text("Need at least 2 unbound stickies to synthesize.");
+    const frames = [...store.nodes.values()].filter(
+      (n): n is FrameNode => n.type === "frame",
+    );
+    const { columns, rows, bindings } = synthesizeTable(stickies, frames);
+    const w = columns.reduce((s, c) => s + c.w, 0);
+    const h = (rows.length + 1) * 34;
+    const right = Math.max(...stickies.map((s) => s.x + s.w));
+    const top = Math.min(...stickies.map((s) => s.y));
+    const pos = findEmptySpace([...store.nodes.values()], w, h, { x: right + 120, y: top });
+    const tableId = newId();
+    store.transact(() => {
+      store.upsertNode({
+        id: tableId, type: "table", parent: null,
+        x: pos.x, y: pos.y, w, h,
+        rotation: 0, index: store.topIndex(), locked: false, data: {},
+        title, columns, rows,
+      });
+      for (const b of bindings) {
+        const sticky = store.getNode(b.stickyId);
+        if (!sticky) continue;
+        store.updateNode(b.stickyId, {
+          data: { ...sticky.data, $source: { table: tableId, row: b.rowId, column: b.columnId } },
+        });
+      }
+    });
+    await settle();
+    const clusters = new Set(rows.map((r) => r.cells.c1)).size;
+    return text(
+      `Synthesized table ${tableId} ("${title}") at (${Math.round(pos.x)}, ${Math.round(pos.y)}): ` +
+        `${rows.length} rows in ${clusters} cluster(s). Each sticky is now a live view of its row.`,
+    );
   },
 );
 
