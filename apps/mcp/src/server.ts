@@ -12,6 +12,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import type { Connector, Endpoint, Node, PaletteColor } from "@orim/schema";
 import { boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG } from "@orim/convert";
+import { findEmptySpace, grid, layered } from "@orim/layout";
 import { docName, openBoard, settle, toExportBoard } from "./boards";
 
 const DB_PATH =
@@ -258,6 +259,52 @@ server.tool(
     });
     await settle();
     return text(`Deleted ${node_ids.length} node(s), ${connector_ids.length} connector(s).`);
+  },
+);
+
+server.tool(
+  "apply_layout",
+  "Auto-arrange nodes. 'layered' (ELK) flows connected nodes along their edges — use for flowcharts and dependency graphs. 'grid' packs nodes into tidy rows — use for loose stickies. Defaults to all top-level non-frame nodes; pass node_ids to layout a subset (e.g. one cluster or one frame's children).",
+  {
+    board: boardArg,
+    node_ids: z.array(z.string()).optional(),
+    algorithm: z.enum(["layered", "grid"]).default("layered"),
+    direction: z.enum(["RIGHT", "DOWN", "LEFT", "UP"]).default("RIGHT")
+      .describe("Flow direction for layered layout"),
+    columns: z.number().int().positive().optional().describe("Column count for grid layout"),
+  },
+  async ({ board, node_ids, algorithm, direction, columns }) => {
+    const { store } = await openBoard(board);
+    const targets = (node_ids ?? [...store.nodes.keys()])
+      .map((id) => store.getNode(id))
+      .filter((n): n is Node => !!n && n.type !== "frame" && (node_ids ? true : n.parent === null));
+    if (targets.length < 2) return text("Need at least 2 nodes to lay out.");
+    const positions =
+      algorithm === "grid"
+        ? grid(targets, { columns })
+        : await layered(targets, [...store.connectors.values()], { direction });
+    store.transact(() => {
+      for (const [id, pos] of positions) store.updateNode(id, pos);
+    });
+    await settle();
+    return text(`Rearranged ${positions.size} node(s) with ${algorithm} layout.`);
+  },
+);
+
+server.tool(
+  "find_empty_space",
+  "Find a free position for a w×h object (nothing within 40 units). Use before create_objects so new content never lands on existing work.",
+  {
+    board: boardArg,
+    w: z.number().positive(),
+    h: z.number().positive(),
+    near: z.object({ x: z.number(), y: z.number() }).optional()
+      .describe("Preferred area; defaults to right of existing content"),
+  },
+  async ({ board, w, h, near }) => {
+    const { store } = await openBoard(board);
+    const pos = findEmptySpace([...store.nodes.values()], w, h, near);
+    return text(`Free space for ${w}×${h}: x=${Math.round(pos.x)}, y=${Math.round(pos.y)}`);
   },
 );
 
