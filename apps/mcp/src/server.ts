@@ -177,9 +177,30 @@ server.tool(
       }
     });
     await settle();
+
+    // Overlap check: warn the agent when new objects land on existing
+    // content, so a bad layout gets fixed instead of shipped silently.
+    const createdIds = new Set(created.map((n) => n.id));
+    const warnings: string[] = [];
+    for (const n of created) {
+      for (const other of store.nodes.values()) {
+        if (createdIds.has(other.id) || other.type === "frame") continue;
+        if (n.type === "frame" && other.parent === n.id) continue;
+        const overlaps =
+          n.x < other.x + other.w && n.x + n.w > other.x &&
+          n.y < other.y + other.h && n.y + n.h > other.y;
+        if (overlaps) {
+          warnings.push(
+            `WARNING: new ${n.type} ${n.id} overlaps existing ${other.type} ${other.id} at (${Math.round(other.x)}, ${Math.round(other.y)}) — move one of them (update_objects) so the board stays readable.`,
+          );
+        }
+      }
+    }
+
     return text(
       `Created ${created.length} node(s), ${connectors.length} connector(s).\n` +
-        created.map((n, i) => `$${i} → ${n.id} (${n.type})`).join("\n"),
+        created.map((n, i) => `$${i} → ${n.id} (${n.type})`).join("\n") +
+        (warnings.length ? `\n\n${warnings.join("\n")}` : ""),
     );
   },
 );
