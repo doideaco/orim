@@ -9,10 +9,13 @@ import {
 import {
   Renderer, PALETTE, PALETTE_KEYS, CURSOR_COLORS, type PresenceState,
 } from "@orim/renderer";
+import {
+  boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG, type ExportBoard,
+} from "@orim/convert";
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
-  Type, Frame, MoveUpRight, Pencil, type IconNode,
+  Type, Frame, MoveUpRight, Pencil, Download, type IconNode,
 } from "lucide";
 
 // Board id comes from the URL (?b=my-board), so a link IS a share link.
@@ -324,6 +327,82 @@ window.addEventListener("pointerdown", (e) => {
 
 refreshSwatchUI();
 
+// --- export ------------------------------------------------------------------
+
+const exportBtn = $("btn-export");
+const exportMenu = $("export-menu");
+exportBtn.prepend(createElement(Download, { width: 15, height: 15, "stroke-width": 2 }));
+
+function exportBoard(): ExportBoard {
+  return {
+    title: BOARD.replace(/^orim-/, ""),
+    nodes: [...store.nodes.values()],
+    connectors: [...store.connectors.values()],
+  };
+}
+
+function download(filename: string, blob: Blob): void {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+}
+
+async function svgToPngBlob(svg: string, scale = 2): Promise<Blob> {
+  const svgBlob = new Blob([svg], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(svgBlob);
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("SVG rasterization failed"));
+      img.src = url;
+    });
+    const c = document.createElement("canvas");
+    c.width = Math.min(8192, Math.round(img.width * scale));
+    c.height = Math.min(8192, Math.round(img.height * scale));
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise<Blob>((resolve, reject) =>
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png"),
+    );
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+const EXPORTERS: Record<string, () => Promise<void>> = {
+  png: async () => download(`${BOARD}.png`, await svgToPngBlob(boardToSVG(exportBoard()))),
+  svg: async () =>
+    download(`${BOARD}.svg`, new Blob([boardToSVG(exportBoard())], { type: "image/svg+xml" })),
+  md: async () =>
+    download(`${BOARD}.md`, new Blob([boardToMarkdown(exportBoard())], { type: "text/markdown" })),
+  mermaid: async () =>
+    download(`${BOARD}.mmd`, new Blob([boardToMermaid(exportBoard())], { type: "text/plain" })),
+  json: async () =>
+    download(
+      `${BOARD}.json`,
+      new Blob([JSON.stringify(boardToJSON(exportBoard(), BOARD), null, 2)], { type: "application/json" }),
+    ),
+};
+
+exportBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  exportMenu.classList.toggle("open");
+});
+for (const btn of exportMenu.querySelectorAll<HTMLButtonElement>("[data-export]")) {
+  btn.addEventListener("click", () => {
+    exportMenu.classList.remove("open");
+    void EXPORTERS[btn.dataset.export!]?.().catch((err) => console.error("export failed", err));
+  });
+}
+window.addEventListener("pointerdown", (e) => {
+  if (!exportMenu.contains(e.target as globalThis.Node) && !exportBtn.contains(e.target as globalThis.Node)) {
+    exportMenu.classList.remove("open");
+  }
+});
+
 // --- zoom & minimap ----------------------------------------------------------
 
 function zoomToFit(): void {
@@ -409,7 +488,20 @@ requestAnimationFrame(frame);
 // Debug handle for verification (not part of the product surface).
 declare global {
   interface Window {
-    orim: { store: BoardStore; camera: Camera; editor: Editor };
+    orim: {
+      store: BoardStore;
+      camera: Camera;
+      editor: Editor;
+      convert: { md(): string; mermaid(): string; svg(): string; json(): unknown };
+    };
   }
 }
-window.orim = { store, camera, editor };
+window.orim = {
+  store, camera, editor,
+  convert: {
+    md: () => boardToMarkdown(exportBoard()),
+    mermaid: () => boardToMermaid(exportBoard()),
+    svg: () => boardToSVG(exportBoard()),
+    json: () => boardToJSON(exportBoard(), BOARD),
+  },
+};

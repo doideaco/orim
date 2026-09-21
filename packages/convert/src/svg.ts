@@ -1,0 +1,168 @@
+/**
+ * Board → standalone SVG. Mirrors the canvas renderer's output closely
+ * enough to be the canonical vector export (and the source for PNG).
+ * Text wrapping is estimated (no canvas measurement here) so this also
+ * runs in Node — e.g. from the MCP server.
+ */
+import type { Connector, Node } from "@orim/schema";
+import { connectorRoute, unionRects, nodeRect, type Point } from "@orim/editor";
+import { PALETTE, CANVAS_BG } from "@orim/renderer";
+import { getStroke } from "perfect-freehand";
+import type { ExportBoard } from "./order";
+
+const FONT = "-apple-system, system-ui, 'Segoe UI', sans-serif";
+const FONT_SIZE = 15;
+const CHAR_W = 0.52; // average glyph width as a fraction of font size
+
+const esc = (s: string): string =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function wrap(text: string, maxWidth: number, fontSize: number): string[] {
+  const maxChars = Math.max(4, Math.floor(maxWidth / (fontSize * CHAR_W)));
+  const lines: string[] = [];
+  for (const raw of text.split("\n")) {
+    let line = "";
+    for (const word of raw.split(" ")) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && candidate.length > maxChars) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
+function textBlock(
+  n: { x: number; y: number; w: number; h: number },
+  text: string,
+  color: string,
+  fontSize: number,
+  centered: boolean,
+  padding = 12,
+): string {
+  const lines = wrap(text, n.w - padding * 2, fontSize);
+  const lineH = fontSize * 1.35;
+  const startY = centered
+    ? Math.max(n.y + padding, n.y + (n.h - lines.length * lineH) / 2)
+    : n.y + padding;
+  const parts: string[] = [];
+  lines.forEach((line, i) => {
+    const y = startY + i * lineH + fontSize * 0.8;
+    if (y > n.y + n.h - 2) return;
+    const anchor = centered ? ` x="${n.x + n.w / 2}" text-anchor="middle"` : ` x="${n.x + padding}"`;
+    parts.push(`<text${anchor} y="${y}" font-family="${FONT}" font-size="${fontSize}" fill="${color}">${esc(line)}</text>`);
+  });
+  return parts.join("\n");
+}
+
+function pathFrom(points: Point[], radius = 10): string {
+  let d = `M ${points[0]!.x} ${points[0]!.y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]!;
+    const corner = points[i]!;
+    const next = points[i + 1]!;
+    const inLen = Math.hypot(corner.x - prev.x, corner.y - prev.y);
+    const outLen = Math.hypot(next.x - corner.x, next.y - corner.y);
+    const r = Math.min(radius, inLen / 2, outLen / 2);
+    const inV = { x: (corner.x - prev.x) / inLen, y: (corner.y - prev.y) / inLen };
+    const outV = { x: (next.x - corner.x) / outLen, y: (next.y - corner.y) / outLen };
+    d += ` L ${corner.x - inV.x * r} ${corner.y - inV.y * r}`;
+    d += ` Q ${corner.x} ${corner.y} ${corner.x + outV.x * r} ${corner.y + outV.y * r}`;
+  }
+  const last = points[points.length - 1]!;
+  d += ` L ${last.x} ${last.y}`;
+  return d;
+}
+
+function arrowhead(from: Point, to: Point, color: string): string {
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const size = 8;
+  const p = (a: number) =>
+    `${to.x - size * Math.cos(angle + a)},${to.y - size * Math.sin(angle + a)}`;
+  return `<polygon points="${to.x},${to.y} ${p(-0.45)} ${p(0.45)}" fill="${color}" />`;
+}
+
+export function boardToSVG(board: ExportBoard): string {
+  const byId = new Map(board.nodes.map((n) => [n.id, n]));
+  const getNode = (id: string) => byId.get(id);
+  const bounds = unionRects(board.nodes.map(nodeRect)) ?? { x: 0, y: 0, w: 800, h: 600 };
+  const pad = 48;
+  const parts: string[] = [];
+
+  const zSorted = [...board.nodes].sort((a, b) =>
+    a.index < b.index ? -1 : a.index > b.index ? 1 : a.id < b.id ? -1 : 1,
+  );
+
+  // Frames behind everything.
+  for (const n of zSorted) {
+    if (n.type !== "frame") continue;
+    parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" fill="#FFFFFF" stroke="#C7C7C2" stroke-width="1.25" />`);
+    parts.push(`<text x="${n.x + 1}" y="${n.y - 8}" font-family="${FONT}" font-size="13" font-weight="600" fill="#6B7280">${esc(n.title)}</text>`);
+  }
+
+  // Connectors under content.
+  for (const c of board.connectors) {
+    const route = connectorRoute(c as Connector, getNode);
+    if (!route || route.length < 2) continue;
+    parts.push(`<path d="${pathFrom(route)}" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />`);
+    const last = route[route.length - 1]!;
+    const beforeLast = route[route.length - 2]!;
+    if (c.style === "arrow" || c.style === "double") parts.push(arrowhead(beforeLast, last, "#6B7280"));
+    if (c.style === "double") parts.push(arrowhead(route[1]!, route[0]!, "#6B7280"));
+  }
+
+  for (const n of zSorted) {
+    switch (n.type) {
+      case "sticky": {
+        const c = PALETTE[n.color];
+        parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="6" fill="${c.fill}" stroke="${c.edge}" />`);
+        if (n.text) parts.push(textBlock(n, n.text, c.text, FONT_SIZE, false));
+        break;
+      }
+      case "shape": {
+        const c = PALETTE[n.color];
+        const fill = n.fillStyle === "solid" ? c.fill : n.fillStyle === "outline" ? CANVAS_BG : "none";
+        const stroke = n.fillStyle === "outline" ? c.solid : c.edge;
+        const sw = n.fillStyle === "outline" ? 2 : 1;
+        const attrs = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"`;
+        if (n.kind === "ellipse") {
+          parts.push(`<ellipse cx="${n.x + n.w / 2}" cy="${n.y + n.h / 2}" rx="${n.w / 2}" ry="${n.h / 2}" ${attrs} />`);
+        } else if (n.kind === "diamond") {
+          parts.push(`<polygon points="${n.x + n.w / 2},${n.y} ${n.x + n.w},${n.y + n.h / 2} ${n.x + n.w / 2},${n.y + n.h} ${n.x},${n.y + n.h / 2}" ${attrs} />`);
+        } else {
+          const rx = n.kind === "pill" ? Math.min(n.w, n.h) / 2 : 8;
+          parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" ${attrs} />`);
+        }
+        if (n.text) parts.push(textBlock(n, n.text, c.text, FONT_SIZE, true));
+        break;
+      }
+      case "text":
+        if (n.text) parts.push(textBlock(n, n.text, "#1F2430", n.fontSize, false, 4));
+        break;
+      case "ink": {
+        const pts: [number, number, number][] = [];
+        for (let i = 0; i + 1 < n.points.length; i += 3) {
+          pts.push([n.x + n.points[i]!, n.y + n.points[i + 1]!, n.points[i + 2] ?? 0.5]);
+        }
+        const outline = getStroke(pts, { size: n.size * 2, thinning: 0.55, smoothing: 0.6, streamline: 0.45 });
+        if (outline.length) {
+          const d = `M ${outline.map((p) => `${p[0]!.toFixed(1)} ${p[1]!.toFixed(1)}`).join(" L ")} Z`;
+          parts.push(`<path d="${d}" fill="${PALETTE[n.color].solid}" />`);
+        }
+        break;
+      }
+    }
+  }
+
+  const vb = `${bounds.x - pad} ${bounds.y - pad} ${bounds.w + pad * 2} ${bounds.h + pad * 2}`;
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="${bounds.w + pad * 2}" height="${bounds.h + pad * 2}">`,
+    `<rect x="${bounds.x - pad}" y="${bounds.y - pad}" width="${bounds.w + pad * 2}" height="${bounds.h + pad * 2}" fill="${CANVAS_BG}" />`,
+    ...parts,
+    `</svg>`,
+  ].join("\n");
+}

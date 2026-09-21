@@ -111,6 +111,44 @@
         color: #fff;
       }
 
+      #exportbar {
+        right: 12px; top: 12px;
+        z-index: 10;
+        padding: 4px;
+      }
+      #btn-export {
+        display: flex; align-items: center; gap: 7px;
+        font: inherit; font-size: 12.5px; font-weight: 500;
+        border: none; background: transparent;
+        border-radius: 8px;
+        padding: 7px 11px;
+        cursor: pointer;
+        color: #40444f;
+      }
+      #btn-export:hover { background: rgba(0, 0, 0, 0.06); }
+      #export-menu {
+        position: fixed;
+        right: 12px; top: 54px;
+        z-index: 20;
+        padding: 5px;
+        display: none;
+        min-width: 170px;
+      }
+      #export-menu.open { display: block; }
+      #export-menu button {
+        display: flex; justify-content: space-between; align-items: baseline;
+        width: 100%;
+        font: inherit; font-size: 12.5px;
+        border: none; background: transparent;
+        border-radius: 7px;
+        padding: 7px 10px;
+        cursor: pointer;
+        color: #1f2430;
+        text-align: left;
+      }
+      #export-menu button:hover { background: rgba(0, 0, 0, 0.06); }
+      #export-menu button span { color: #9ca3af; font-size: 11px; margin-left: 16px; }
+
       #zoombar {
         right: 12px; bottom: 172px;
         display: flex; align-items: center;
@@ -208,6 +246,17 @@
     <div id="color-popover" class="panel">
       <div id="popover-swatches"></div>
       <div id="popover-fillstyles"></div>
+    </div>
+
+    <div id="exportbar" class="panel">
+      <button id="btn-export">Export</button>
+    </div>
+    <div id="export-menu" class="panel">
+      <button data-export="png">PNG <span>image</span></button>
+      <button data-export="svg">SVG <span>vector</span></button>
+      <button data-export="md">Markdown <span>outline</span></button>
+      <button data-export="mermaid">Mermaid <span>diagram</span></button>
+      <button data-export="json">JSON <span>orim format</span></button>
     </div>
 
     <div id="zoombar" class="panel">

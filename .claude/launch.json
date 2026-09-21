@@ -2,9 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "web",
+      "url": "http://localhost:5181",
+      "port": 5181
+    },
+    {
       "name": "spike",
-      "runtimeExecutable": "/Users/alexmorris/.volta/bin/pnpm",
-      "runtimeArgs": ["--dir", "apps/spike", "dev"],
+      "url": "http://localhost:5180",
       "port": 5180
     }
   ]
