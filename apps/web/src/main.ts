@@ -451,6 +451,12 @@ function refreshSwatchUI(): void {
   for (const b of fillStylesEl.children) {
     b.classList.toggle("active", (b as HTMLElement).dataset.fill === defaultFillStyle);
   }
+  // Shape segment reflects the selected object, when there is one.
+  const sel = editor.singleSelectedNode();
+  const kind = sel?.type === "sticky" ? "sticky" : sel?.type === "shape" ? sel.kind : null;
+  for (const b of $("popover-shapes").children) {
+    b.classList.toggle("active", (b as HTMLElement).dataset.kind === kind);
+  }
 }
 
 for (const key of PALETTE_KEYS) {
@@ -480,10 +486,12 @@ const SHAPE_OPTIONS: [("sticky" | "rect" | "ellipse" | "diamond" | "pill"), Icon
 for (const [kind, icon, label] of SHAPE_OPTIONS) {
   const btn = document.createElement("button");
   btn.title = label;
+  btn.dataset.kind = kind;
   btn.setAttribute("aria-label", label);
   btn.appendChild(createElement(icon, { width: 15, height: 15, "stroke-width": 1.75 }));
   btn.addEventListener("click", () => {
     editor.setSelectionShape(kind);
+    refreshSwatchUI();
     dirty = true;
     dataPanel.scheduleRefresh();
   });
@@ -508,9 +516,10 @@ swatchBtn.addEventListener("click", (e) => {
   const willOpen = !popover.classList.contains("open");
   popover.classList.toggle("open", willOpen);
   if (willOpen) {
+    refreshSwatchUI();
     const r = swatchBtn.getBoundingClientRect();
     popover.style.left = `${r.right + 10}px`;
-    popover.style.top = `${Math.min(r.top, window.innerHeight - 180)}px`;
+    popover.style.top = `${Math.min(r.top, window.innerHeight - 280)}px`;
   }
 });
 window.addEventListener("pointerdown", (e) => {
