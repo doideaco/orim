@@ -66,6 +66,8 @@ export class Editor {
   draftConnector: { from: Point; to: Point } | null = null;
   draftInk: number[] | null = null;
   cursorWorld: Point = { x: 0, y: 0 };
+  /** Node under the cursor (select tool, not dragging) — shows its ports. */
+  hoveredId: string | null = null;
 
   private drag: DragState = { kind: "none" };
   private clipboard: { nodes: Node[]; connectors: Connector[] } | null = null;
@@ -139,6 +141,44 @@ export class Editor {
     return null;
   }
 
+  /** Connector port under a screen point: edge midpoints of the hovered
+   *  or single-selected node. */
+  portAt(screen: Point): { nodeId: string; side: "n" | "s" | "e" | "w" } | null {
+    for (const id of [this.hoveredId, this.singleSelectedNode()?.id]) {
+      if (!id) continue;
+      const n = this.store.getNode(id);
+      if (!n || n.type === "frame" || n.type === "ink") continue;
+      const ports: ["n" | "s" | "e" | "w", Point][] = [
+        ["n", { x: n.x + n.w / 2, y: n.y }],
+        ["s", { x: n.x + n.w / 2, y: n.y + n.h }],
+        ["e", { x: n.x + n.w, y: n.y + n.h / 2 }],
+        ["w", { x: n.x, y: n.y + n.h / 2 }],
+      ];
+      for (const [side, world] of ports) {
+        const s = {
+          x: (world.x - this.camera.x) * this.camera.zoom,
+          y: (world.y - this.camera.y) * this.camera.zoom,
+        };
+        if (Math.hypot(s.x - screen.x, s.y - screen.y) <= 9) return { nodeId: id, side };
+      }
+    }
+    return null;
+  }
+
+  /** Endpoint for a world point: a node, a table row, or a free point. */
+  private endpointFor(p: Point, excludeNodeId: string | null): Endpoint {
+    const hit = this.hitNode(p);
+    if (!hit || hit.id === excludeNodeId) return { point: p };
+    if (hit.type === "table") {
+      const cell = tableCellAt(hit, p);
+      if (cell && cell.rowIndex >= 0) {
+        const row = hit.rows[cell.rowIndex];
+        if (row) return { node: hit.id, anchor: "auto", row: row.id };
+      }
+    }
+    return { node: hit.id, anchor: "auto" };
+  }
+
   singleSelectedNode(): Node | null {
     if (this.selection.size !== 1) return null;
     const [id] = this.selection;
@@ -163,6 +203,19 @@ export class Editor {
         if (handle) {
           const node = this.singleSelectedNode()!;
           this.drag = { kind: "resize", id: node.id, handle, orig: nodeRect(node) };
+          return;
+        }
+        // Dragging from a port starts a connector without switching tools.
+        const port = this.portAt(screen);
+        if (port) {
+          const n = this.store.getNode(port.nodeId)!;
+          const start = anchorPoint(nodeRect(n), port.side, world);
+          this.drag = {
+            kind: "connector",
+            from: { node: port.nodeId, anchor: port.side },
+            fromNode: port.nodeId,
+          };
+          this.draftConnector = { from: start, to: world };
           return;
         }
         const hit = this.hitNode(world);
@@ -225,9 +278,12 @@ export class Editor {
         return;
 
       case "connector": {
-        const hit = this.hitNode(world, { frameBodies: false });
-        const from: Endpoint = hit ? { node: hit.id, anchor: "auto" } : { point: world };
-        this.drag = { kind: "connector", from, fromNode: hit?.id ?? null };
+        const from = this.endpointFor(world, null);
+        this.drag = {
+          kind: "connector",
+          from,
+          fromNode: "node" in from ? from.node : null,
+        };
         this.draftConnector = { from: world, to: world };
         return;
       }
@@ -259,6 +315,28 @@ export class Editor {
     const { world, screen } = info;
     this.cursorWorld = world;
     const drag = this.drag;
+    if (drag.kind === "none" && (this.tool === "select" || this.tool === "connector")) {
+      const hit = this.hitNode(world);
+      if (hit) {
+        this.hoveredId = hit.id;
+      } else if (this.hoveredId) {
+        // Keep the ports up while the cursor is in the node's halo, so
+        // they can actually be grabbed just outside the edge.
+        const n = this.store.getNode(this.hoveredId);
+        const halo = 14 / this.camera.zoom;
+        if (
+          !n ||
+          !rectContains(
+            { x: n.x - halo, y: n.y - halo, w: n.w + halo * 2, h: n.h + halo * 2 },
+            world,
+          )
+        ) {
+          this.hoveredId = null;
+        }
+      }
+    } else if (drag.kind !== "none") {
+      this.hoveredId = null;
+    }
     switch (drag.kind) {
       case "pan":
         this.camera.x = drag.camStart.x - (screen.x - drag.start.x) / this.camera.zoom;
@@ -373,11 +451,7 @@ export class Editor {
 
       case "connector": {
         this.draftConnector = null;
-        const hit = this.hitNode(info.world);
-        const to: Endpoint =
-          hit && hit.id !== drag.fromNode
-            ? { node: hit.id, anchor: "auto" }
-            : { point: info.world };
+        const to = this.endpointFor(info.world, drag.fromNode);
         // A connector from a point to the same point is a misclick.
         if (
           "point" in drag.from && "point" in to &&
@@ -542,6 +616,36 @@ export class Editor {
         const n = this.store.getNode(id);
         if (n && (n.type === "sticky" || n.type === "shape" || n.type === "ink")) {
           this.store.updateNode(id, { color });
+        }
+      }
+    });
+  }
+
+  /** Convert stickies ↔ shapes and switch shape kinds, in place: id,
+   *  geometry, text, color, parent and data (bindings!) all survive. */
+  setSelectionShape(kind: "sticky" | ShapeNode["kind"]): void {
+    this.store.transact(() => {
+      for (const id of this.selection) {
+        const n = this.store.getNode(id);
+        if (!n || (n.type !== "sticky" && n.type !== "shape")) continue;
+        if (kind === "sticky") {
+          if (n.type === "sticky") continue;
+          this.store.upsertNode({
+            id: n.id, type: "sticky", parent: n.parent,
+            x: n.x, y: n.y, w: n.w, h: n.h,
+            rotation: n.rotation, index: n.index, locked: n.locked, data: n.data,
+            text: n.text, color: n.color,
+          });
+        } else if (n.type === "shape") {
+          this.store.updateNode(id, { kind });
+        } else {
+          this.store.upsertNode({
+            id: n.id, type: "shape", parent: n.parent,
+            x: n.x, y: n.y, w: n.w, h: n.h,
+            rotation: n.rotation, index: n.index, locked: n.locked, data: n.data,
+            kind, text: n.text, color: n.color,
+            fillStyle: this.hooks.defaultFillStyle(),
+          });
         }
       }
     });

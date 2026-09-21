@@ -30,6 +30,8 @@ export interface Scene {
   dataLinks: { a: Point; b: Point }[];
   /** Frame timestamp; drives the data-link dash animation. */
   timestamp?: number;
+  /** Node whose connector ports should be shown (hover affordance). */
+  portsFor: NodeId | null;
   marquee: Rect | null;
   draftRect: Rect | null;
   draftConnector: { from: Point; to: Point } | null;
@@ -257,6 +259,28 @@ export class Renderer {
           ctx.beginPath();
           ctx.rect(hx - hs, hy - hs, hs * 2, hs * 2);
           ctx.fill();
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Connector ports on the hovered node: grab one to draw a connector.
+    if (scene.portsFor) {
+      const n = scene.getNode(scene.portsFor);
+      if (n && n.type !== "frame" && n.type !== "ink") {
+        const ports = [
+          { x: n.x + n.w / 2, y: n.y },
+          { x: n.x + n.w / 2, y: n.y + n.h },
+          { x: n.x + n.w, y: n.y + n.h / 2 },
+          { x: n.x, y: n.y + n.h / 2 },
+        ];
+        for (const p of ports) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 5 / z, 0, Math.PI * 2);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fill();
+          ctx.lineWidth = 1.75 / z;
+          ctx.strokeStyle = SELECTION_COLOR;
           ctx.stroke();
         }
       }

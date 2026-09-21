@@ -132,7 +132,13 @@ export class A11yMirror {
     const end = (e: Connector["from"]): string => {
       if ("point" in e) return "a point";
       const n = this.store.getNode(e.node);
-      return n ? `"${nodeLabel(n).replace(/\n/g, " ")}"` : "a removed object";
+      if (!n) return "a removed object";
+      if (e.row && n.type === "table") {
+        const row = n.rows.find((r) => r.id === e.row);
+        const first = row ? Object.values(row.cells).find(Boolean) : undefined;
+        if (first) return `row "${first}" of "${nodeLabel(n)}"`.replace(/\n/g, " ");
+      }
+      return `"${nodeLabel(n).replace(/\n/g, " ")}"`;
     };
     const label = c.label ? `, labeled "${c.label}"` : "";
     return `Connector from ${end(c.from)} to ${end(c.to)}${label}`;

@@ -47,7 +47,13 @@ export function boardToMarkdown(board: ExportBoard): string {
     const endLabel = (e: Endpoint): string => {
       if ("point" in e) return "(point)";
       const n = byId.get(e.node);
-      return n ? nodeLabel(n).replace(/\n/g, " ") : "(missing)";
+      if (!n) return "(missing)";
+      if (e.row && n.type === "table") {
+        const row = n.rows.find((r) => r.id === e.row);
+        const first = row ? Object.values(row.cells).find(Boolean) : undefined;
+        if (first) return `${nodeLabel(n)} row "${first}"`.replace(/\n/g, " ");
+      }
+      return nodeLabel(n).replace(/\n/g, " ");
     };
     for (const c of board.connectors) {
       const arrow = c.style === "double" ? "↔" : "→";

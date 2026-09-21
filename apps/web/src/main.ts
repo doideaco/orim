@@ -18,7 +18,8 @@ import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
-  Type, Frame, MoveUpRight, Pencil, Download, Table, type IconNode,
+  Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
+  type IconNode,
 } from "lucide";
 
 // Board id comes from the URL (?b=my-board), so a link IS a share link.
@@ -298,6 +299,7 @@ canvas.addEventListener("pointermove", (e) => {
   const i = info(e);
   awareness?.setLocalStateField("cursor", i.world);
   editor.pointerMove(i);
+  canvas.style.cursor = editor.portAt(i.screen) ? "crosshair" : "";
   dirty = true;
 });
 
@@ -466,6 +468,28 @@ for (const key of PALETTE_KEYS) {
   swatchesEl.appendChild(btn);
 }
 
+// Shape switcher: converts the selection in place (sticky ↔ shape kinds).
+const shapesEl = $("popover-shapes");
+const SHAPE_OPTIONS: [("sticky" | "rect" | "ellipse" | "diamond" | "pill"), IconNode, string][] = [
+  ["sticky", StickyNote, "Sticky note"],
+  ["rect", Square, "Rectangle"],
+  ["ellipse", Circle, "Ellipse"],
+  ["diamond", Diamond, "Diamond"],
+  ["pill", RectangleHorizontal, "Pill"],
+];
+for (const [kind, icon, label] of SHAPE_OPTIONS) {
+  const btn = document.createElement("button");
+  btn.title = label;
+  btn.setAttribute("aria-label", label);
+  btn.appendChild(createElement(icon, { width: 15, height: 15, "stroke-width": 1.75 }));
+  btn.addEventListener("click", () => {
+    editor.setSelectionShape(kind);
+    dirty = true;
+    dataPanel.scheduleRefresh();
+  });
+  shapesEl.appendChild(btn);
+}
+
 for (const fill of ["solid", "outline", "none"] as const) {
   const btn = document.createElement("button");
   btn.dataset.fill = fill;
@@ -625,6 +649,10 @@ function frame(): void {
       revision: store.revision,
       dataLinks,
       timestamp: performance.now(),
+      portsFor:
+        editor.tool === "select" || editor.tool === "connector"
+          ? editor.hoveredId ?? editor.singleSelectedNode()?.id ?? null
+          : null,
       marquee: editor.marquee,
       draftRect: editor.draftRect,
       draftConnector: editor.draftConnector,

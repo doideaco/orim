@@ -44,6 +44,20 @@ function resolveEndpoints(
     if ("point" in e) return { p: e.point, side: null, nodeId: null };
     const n = getNode(e.node);
     if (!n) return null;
+    // Row-level endpoint on a table: anchor at that row's edge, east or
+    // west (rows read sideways), whichever faces the other end.
+    if (e.row && n.type === "table") {
+      const rowIndex = n.rows.findIndex((r) => r.id === e.row);
+      if (rowIndex >= 0) {
+        const rowY = Math.min(n.y + (rowIndex + 1.5) * 34, n.y + n.h - 17);
+        const side: Side = towards.x >= n.x + n.w / 2 ? "e" : "w";
+        return {
+          p: { x: side === "e" ? n.x + n.w : n.x, y: rowY },
+          side,
+          nodeId: e.node,
+        };
+      }
+    }
     const side = anchorSide(nodeRect(n), e.anchor, towards);
     return { p: anchorPoint(nodeRect(n), side, towards), side, nodeId: e.node };
   };

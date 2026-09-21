@@ -98,6 +98,24 @@
         cursor: pointer;
       }
       #popover-swatches button.active { outline: 2px solid var(--accent); outline-offset: 2px; }
+      #popover-shapes {
+        display: flex; gap: 4px;
+        margin-top: 10px;
+        border-top: 1px solid var(--border);
+        padding-top: 10px;
+      }
+      #popover-shapes button {
+        flex: 1;
+        display: grid; place-items: center;
+        padding: 5px 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fff;
+        color: #40444f;
+        cursor: pointer;
+      }
+      #popover-shapes button:hover { background: #f3f3f1; }
+      #popover-shapes svg { width: 15px; height: 15px; display: block; }
       #popover-fillstyles {
         display: flex; gap: 4px;
         margin-top: 10px;
@@ -360,6 +378,7 @@
 
     <div id="color-popover" class="panel">
       <div id="popover-swatches"></div>
+      <div id="popover-shapes"></div>
       <div id="popover-fillstyles"></div>
     </div>
 
