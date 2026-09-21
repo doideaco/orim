@@ -158,6 +158,29 @@ export const Connector = z.object({
 export type Connector = z.infer<typeof Connector>;
 
 // ---------------------------------------------------------------------------
+// Comments
+// ---------------------------------------------------------------------------
+
+export const CommentReply = z.object({
+  author: z.string(),
+  body: z.string(),
+  at: z.number(),
+});
+export type CommentReply = z.infer<typeof CommentReply>;
+
+/** A threaded comment, anchored to a node (follows it) or a free point. */
+export const BoardComment = z.object({
+  id: z.string(),
+  anchor: z.union([z.object({ node: NodeId }), z.object({ point: Vec })]),
+  author: z.string(),
+  body: z.string(),
+  at: z.number(),
+  resolved: z.boolean().default(false),
+  replies: z.array(CommentReply).default([]),
+});
+export type BoardComment = z.infer<typeof BoardComment>;
+
+// ---------------------------------------------------------------------------
 // Board document
 // ---------------------------------------------------------------------------
 
@@ -167,6 +190,7 @@ export const BoardDoc = z.object({
   title: z.string().default("Untitled board"),
   nodes: z.record(NodeId, Node),
   connectors: z.record(NodeId, Connector),
+  comments: z.record(z.string(), BoardComment).default({}),
 });
 export type BoardDoc = z.infer<typeof BoardDoc>;
 
@@ -176,7 +200,7 @@ export function parseBoard(input: unknown): BoardDoc {
 }
 
 export function emptyBoard(id: string, title = "Untitled board"): BoardDoc {
-  return { schemaVersion: SCHEMA_VERSION, id, title, nodes: {}, connectors: {} };
+  return { schemaVersion: SCHEMA_VERSION, id, title, nodes: {}, connectors: {}, comments: {} };
 }
 
 // ---------------------------------------------------------------------------

@@ -63,5 +63,24 @@ export function boardToMarkdown(board: ExportBoard): string {
     lines.push("");
   }
 
+  const open = (board.comments ?? []).filter((c) => !c.resolved);
+  if (open.length) {
+    lines.push(`## Comments`, "");
+    for (const c of open) {
+      const anchor =
+        "node" in c.anchor
+          ? (() => {
+              const n = byId.get(c.anchor.node as string);
+              return n ? ` on "${nodeLabel(n).replace(/\n/g, " ")}"` : "";
+            })()
+          : "";
+      lines.push(`- **${c.author}**${anchor}: ${c.body.replace(/\n/g, " ")}`);
+      for (const r of c.replies) {
+        lines.push(`  - ${r.author}: ${r.body.replace(/\n/g, " ")}`);
+      }
+    }
+    lines.push("");
+  }
+
   return lines.join("\n");
 }

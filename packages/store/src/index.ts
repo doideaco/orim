@@ -14,7 +14,7 @@
  * `nodesSorted` additionally maintains a z-ordered array, rebuilt lazily.
  */
 import * as Y from "yjs";
-import type { Connector, Node, NodeId } from "@orim/schema";
+import type { BoardComment, Connector, Node, NodeId } from "@orim/schema";
 
 export const LOCAL_ORIGIN = "orim-local";
 
@@ -25,8 +25,10 @@ export class BoardStore {
   readonly undo: Y.UndoManager;
   private readonly yNodes: Y.Map<Y.Map<unknown>>;
   private readonly yConnectors: Y.Map<Y.Map<unknown>>;
+  private readonly yComments: Y.Map<Y.Map<unknown>>;
   private readonly nodeCache = new Map<NodeId, Node>();
   private readonly connectorCache = new Map<NodeId, Connector>();
+  private readonly commentCache = new Map<string, BoardComment>();
   private sorted: Node[] = [];
   private sortedDirty = true;
   private listeners = new Set<Listener>();
@@ -37,7 +39,8 @@ export class BoardStore {
     this.doc = doc;
     this.yNodes = doc.getMap("nodes");
     this.yConnectors = doc.getMap("connectors");
-    this.undo = new Y.UndoManager([this.yNodes, this.yConnectors], {
+    this.yComments = doc.getMap("comments");
+    this.undo = new Y.UndoManager([this.yNodes, this.yConnectors, this.yComments], {
       trackedOrigins: new Set([LOCAL_ORIGIN]),
     });
 
@@ -64,6 +67,7 @@ export class BoardStore {
     };
     wire(this.yNodes, this.nodeCache as Map<string, Record<string, unknown>>);
     wire(this.yConnectors, this.connectorCache as Map<string, Record<string, unknown>>);
+    wire(this.yComments, this.commentCache as Map<string, Record<string, unknown>>);
   }
 
   private refresh(
@@ -135,6 +139,9 @@ export class BoardStore {
       for (const n of this.nodeCache.values()) {
         if (n.parent === id) this.yNodes.get(n.id)?.set("parent", null);
       }
+      for (const c of this.commentCache.values()) {
+        if ("node" in c.anchor && c.anchor.node === id) this.yComments.delete(c.id);
+      }
     });
   }
 
@@ -183,6 +190,39 @@ export class BoardStore {
 
   deleteConnector(id: NodeId): void {
     this.transact(() => this.yConnectors.delete(id));
+  }
+
+  // --- comments ------------------------------------------------------------
+
+  get comments(): ReadonlyMap<string, BoardComment> {
+    return this.commentCache;
+  }
+
+  getComment(id: string): BoardComment | undefined {
+    return this.commentCache.get(id);
+  }
+
+  upsertComment(comment: BoardComment): void {
+    this.transact(() => {
+      const yObj = new Y.Map<unknown>();
+      for (const [k, v] of Object.entries(comment)) yObj.set(k, v);
+      this.yComments.set(comment.id, yObj);
+    });
+  }
+
+  updateComment(id: string, patch: Partial<BoardComment>): void {
+    const yObj = this.yComments.get(id);
+    if (!yObj) return;
+    this.transact(() => {
+      for (const [k, v] of Object.entries(patch)) {
+        if (k === "id") continue;
+        yObj.set(k, v);
+      }
+    });
+  }
+
+  deleteComment(id: string): void {
+    this.transact(() => this.yComments.delete(id));
   }
 
   // --- shared --------------------------------------------------------------

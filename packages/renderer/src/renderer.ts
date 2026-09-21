@@ -4,7 +4,17 @@ import {
   tableColumnEdges, TABLE_ROW_H,
   type Camera, type Point, type Rect,
 } from "@orim/editor";
-import type { TableNode } from "@orim/schema";
+import type { BoardComment, TableNode } from "@orim/schema";
+
+/** World position of a comment's pin. */
+export function commentPinPos(
+  c: BoardComment,
+  getNode: (id: string) => { x: number; y: number; w: number; h: number } | undefined,
+): Point | null {
+  if ("point" in c.anchor) return c.anchor.point;
+  const n = getNode(c.anchor.node);
+  return n ? { x: n.x + n.w, y: n.y } : null;
+}
 import { getStroke } from "perfect-freehand";
 import { PALETTE, SELECTION_COLOR, CANVAS_BG } from "./colors";
 
@@ -32,6 +42,10 @@ export interface Scene {
   timestamp?: number;
   /** Node whose connector ports should be shown (hover affordance). */
   portsFor: NodeId | null;
+  /** Unresolved comments to draw as pins. */
+  comments: BoardComment[];
+  /** Comment whose thread is open (its pin is highlighted). */
+  activeCommentId: string | null;
   marquee: Rect | null;
   draftRect: Rect | null;
   draftConnector: { from: Point; to: Point } | null;
@@ -310,8 +324,41 @@ export class Renderer {
       ctx.strokeRect(scene.marquee.x, scene.marquee.y, scene.marquee.w, scene.marquee.h);
     }
 
-    // Remote cursors in screen space.
+    // Comment pins in screen space (constant size, anchored in the world).
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    for (const c of scene.comments) {
+      const world = commentPinPos(c, scene.getNode);
+      if (!world) continue;
+      const s = toScreen(camera, world);
+      if (s.x < -30 || s.y < -30 || s.x > this.width + 30 || s.y > this.height + 30) continue;
+      const active = c.id === scene.activeCommentId;
+      const r = 12;
+      // Teardrop: circle with a squared-off bottom-left corner.
+      ctx.beginPath();
+      ctx.moveTo(s.x - r, s.y - r * 0.2);
+      ctx.arc(s.x, s.y - r * 0.2 - 0.01, r, Math.PI, Math.PI * 2.75, false);
+      ctx.arc(s.x, s.y - r * 0.2, r, Math.PI * 0.75, Math.PI, false);
+      ctx.closePath();
+      ctx.fillStyle = active ? SELECTION_COLOR : "#FFFFFF";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = active ? SELECTION_COLOR : "rgba(0,0,0,0.18)";
+      ctx.stroke();
+      ctx.fillStyle = active ? "#FFFFFF" : "#374151";
+      ctx.font = `600 11px ${FONT_STACK}`;
+      ctx.textBaseline = "middle";
+      const initial = (c.author[0] ?? "?").toUpperCase();
+      ctx.fillText(initial, s.x - ctx.measureText(initial).width / 2, s.y - r * 0.2 + 1);
+      if (c.replies.length) {
+        ctx.fillStyle = "#E0529C";
+        ctx.beginPath();
+        ctx.arc(s.x + r * 0.75, s.y - r, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.textBaseline = "top";
+    }
+
+    // Remote cursors in screen space.
     for (const p of scene.presences) {
       if (!p.cursor) continue;
       const s = toScreen(camera, p.cursor);

@@ -16,5 +16,6 @@ export function boardToJSON(board: ExportBoard, id = "board"): BoardDoc {
     title: board.title ?? "Untitled board",
     nodes: Object.fromEntries(board.nodes.map((n) => [n.id, n])),
     connectors: Object.fromEntries(board.connectors.map((c) => [c.id, c])),
+    comments: Object.fromEntries((board.comments ?? []).map((c) => [c.id, c])),
   };
 }

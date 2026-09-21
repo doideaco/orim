@@ -103,6 +103,11 @@ export class A11yMirror {
     for (const c of this.store.connectors.values()) {
       current.set(c.id, this.connectorLabel(c));
     }
+    for (const c of this.store.comments.values()) {
+      if (c.resolved) continue;
+      const replies = c.replies.length ? `, ${c.replies.length} replies` : "";
+      current.set(c.id, `Comment by ${c.author}: ${c.body.slice(0, 80)}${replies}`);
+    }
     const messages: string[] = [];
     for (const [id, label] of current) {
       const prev = this.prevLabels.get(id);

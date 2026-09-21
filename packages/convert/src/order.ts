@@ -4,12 +4,13 @@
  * then loose nodes. "Spatial" = rows top-to-bottom, left-to-right within
  * a row band, which matches how people read a board.
  */
-import type { Connector, FrameNode, Node } from "@orim/schema";
+import type { BoardComment, Connector, FrameNode, Node } from "@orim/schema";
 
 export interface ExportBoard {
   title?: string;
   nodes: Node[];
   connectors: Connector[];
+  comments?: BoardComment[];
 }
 
 const ROW_BAND = 80; // world units: nodes whose tops are this close share a row

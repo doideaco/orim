@@ -12,7 +12,7 @@ import { routeConnector } from "./routing";
 
 export type ToolName =
   | "select" | "hand" | "sticky" | "rect" | "ellipse" | "diamond" | "pill"
-  | "text" | "frame" | "connector" | "ink" | "table";
+  | "text" | "frame" | "connector" | "ink" | "table" | "comment";
 
 const SHAPE_TOOLS: Record<string, ShapeNode["kind"]> = {
   rect: "rect", ellipse: "ellipse", diamond: "diamond", pill: "pill",
@@ -23,6 +23,8 @@ export interface EditorHooks {
   openTextEditor(node: Node): void;
   /** Edit a table cell; rowIndex -1 is the header (renames the column). */
   openTableCell(table: TableNode, rowIndex: number, colIndex: number): void;
+  /** Start a new comment thread at a node or a free point. */
+  openCommentComposer(anchor: { node: string } | { point: Point }): void;
   defaultColor(): PaletteColor;
   defaultFillStyle(): ShapeNode["fillStyle"];
 }
@@ -292,6 +294,13 @@ export class Editor {
         this.drag = { kind: "ink", points: [world.x, world.y, 0.5] };
         this.draftInk = this.drag.points;
         return;
+
+      case "comment": {
+        const hit = this.hitNode(world);
+        this.tool = "select";
+        this.hooks.openCommentComposer(hit ? { node: hit.id } : { point: world });
+        return;
+      }
 
       case "table": {
         const columns = ["Item", "Owner", "Status"].map((name, i) => ({

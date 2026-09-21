@@ -17,10 +17,11 @@ import { TextEditorOverlay, isEditable } from "./editor-overlay";
 import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
 import { ORIM_CLIP_MARKER, setupFileDrop, setupPaste } from "./import-drop";
+import { CommentsUI } from "./comments-ui";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
-  type IconNode,
+  MessageCircle, type IconNode,
 } from "lucide";
 
 // Board id comes from the URL (?b=my-board), so a link IS a share link.
@@ -52,6 +53,10 @@ const editor = new Editor(store, camera, {
   defaultColor: () => defaultColor,
   defaultFillStyle: () => defaultFillStyle,
   openTableCell: (table, rowIndex, colIndex) => openTableCellEditor(table, rowIndex, colIndex),
+  openCommentComposer: (anchor) => {
+    comments.compose(anchor);
+    dirty = true;
+  },
   openTextEditor: (node) => {
     if (node.type === "frame") {
       openFrameTitleEditor(node);
@@ -105,6 +110,10 @@ function openFrameTitleEditor(frame: { id: string; x: number; y: number; title: 
 }
 
 const dataPanel = new DataPanel(store, editor, camera, () => {
+  dirty = true;
+});
+
+const comments = new CommentsUI(store, camera, () => me.name, () => {
   dirty = true;
 });
 
@@ -263,6 +272,7 @@ awareness?.on("change", () => {
 store.subscribe(() => {
   dirty = true;
   dataPanel.scheduleRefresh();
+  comments.refresh();
   reconcileDerived();
 });
 
@@ -325,6 +335,14 @@ const info = (e: PointerEvent | MouseEvent) => ({
 
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 && e.button !== 1) return;
+  if (editor.tool === "select") {
+    const pin = comments.pinAt({ x: e.clientX, y: e.clientY });
+    if (pin) {
+      comments.open(pin.id);
+      dirty = true;
+      return;
+    }
+  }
   if (overlay.activeId) {
     const hit = editor.hitNode(toWorld(camera, { x: e.clientX, y: e.clientY }));
     if (hit?.id === overlay.activeId) return;
@@ -377,6 +395,7 @@ canvas.addEventListener(
 const TOOL_KEYS: Record<string, ToolName> = {
   v: "select", h: "hand", n: "sticky", r: "rect", o: "ellipse",
   d: "diamond", t: "text", f: "frame", c: "connector", p: "ink", g: "table",
+  m: "comment",
 };
 
 window.addEventListener("keydown", (e) => {
@@ -442,7 +461,7 @@ window.addEventListener("resize", () => {
 const TOOL_ICONS: Record<string, IconNode> = {
   select: MousePointer2, hand: Hand, sticky: StickyNote, rect: Square,
   ellipse: Circle, diamond: Diamond, text: Type, frame: Frame,
-  connector: MoveUpRight, ink: Pencil, table: Table,
+  connector: MoveUpRight, ink: Pencil, table: Table, comment: MessageCircle,
 };
 
 const toolButtons = [...document.querySelectorAll<HTMLButtonElement>("#toolbar [data-tool]")];
@@ -580,6 +599,7 @@ function exportBoard(): ExportBoard {
     title: BOARD.replace(/^orim-/, ""),
     nodes: [...store.nodes.values()],
     connectors: [...store.connectors.values()],
+    comments: [...store.comments.values()],
   };
 }
 
@@ -701,6 +721,8 @@ function frame(): void {
         editor.tool === "select" || editor.tool === "connector"
           ? editor.hoveredId ?? editor.singleSelectedNode()?.id ?? null
           : null,
+      comments: comments.visible(),
+      activeCommentId: comments.activeId,
       marquee: editor.marquee,
       draftRect: editor.draftRect,
       draftConnector: editor.draftConnector,
@@ -708,6 +730,7 @@ function frame(): void {
       draftColor: PALETTE[defaultColor].solid,
     });
     overlay.reposition(camera);
+    comments.reposition();
     dirty = false;
   }
 
