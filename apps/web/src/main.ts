@@ -13,6 +13,7 @@ import {
   boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG, type ExportBoard,
 } from "@orim/convert";
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
+import { DataPanel } from "./data-panel";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, type IconNode,
@@ -82,6 +83,10 @@ function openFrameTitleEditor(frame: { id: string; x: number; y: number; title: 
   });
 }
 
+const dataPanel = new DataPanel(store, editor, camera, () => {
+  dirty = true;
+});
+
 // --- sync --------------------------------------------------------------------
 
 const provider = new HocuspocusProvider({
@@ -118,6 +123,7 @@ awareness?.on("change", () => {
 
 store.subscribe(() => {
   dirty = true;
+  dataPanel.scheduleRefresh();
 });
 
 // --- pointer -----------------------------------------------------------------
@@ -151,6 +157,7 @@ canvas.addEventListener("pointerup", (e) => {
   editor.pointerUp(info(e));
   syncToolbar();
   dirty = true;
+  dataPanel.scheduleRefresh();
 });
 
 canvas.addEventListener("dblclick", (e) => {
@@ -183,6 +190,10 @@ const TOOL_KEYS: Record<string, ToolName> = {
 
 window.addEventListener("keydown", (e) => {
   if (overlay.activeId) return; // ProseMirror owns the keyboard while editing
+  const t = e.target as HTMLElement;
+  if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable) {
+    return; // form fields (data panel, frame rename) own their keys
+  }
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key.toLowerCase();
 
@@ -221,11 +232,14 @@ window.addEventListener("keydown", (e) => {
     zoomToFit();
   } else if (key === "0") {
     camera.zoom = 1;
+  } else if (key === "\\") {
+    dataPanel.toggle();
   } else if (TOOL_KEYS[key]) {
     editor.tool = TOOL_KEYS[key]!;
   }
   syncToolbar();
   dirty = true;
+  dataPanel.scheduleRefresh();
 });
 
 window.addEventListener("resize", () => {
