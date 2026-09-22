@@ -24,6 +24,11 @@ as gaps close.
   collapse and expand, Home/End jump, Enter edits text in place (a real
   contenteditable), Delete removes objects. Selection follows focus and
   the camera moves to the focused object.
+- **Keyboard on the canvas itself**: tree diagrams (org charts, mind
+  maps) are navigable in place — arrow keys move between parent,
+  children and siblings, Tab adds a connected child, Enter a sibling —
+  so structured diagrams can be both read and *authored* without a
+  pointer.
 - **Live announcements**: additions, removals and edits — including
   collaborators' and AI agents' — are announced via a polite live
   region.

@@ -534,6 +534,52 @@ function treeEdges(): TreeEdge[] {
 const treeParentEdgeOf = (id: string): TreeEdge | null =>
   treeEdges().find((c) => c.to.node === id) ?? null;
 
+/** A node's tree children in visual (left-to-right) order. */
+function treeChildrenOf(id: string): import("@orim/schema").Node[] {
+  return treeEdges()
+    .filter((c) => c.from.node === id)
+    .map((c) => store.getNode(c.to.node))
+    .filter((n): n is import("@orim/schema").Node => !!n)
+    .sort((a, b) => a.x - b.x);
+}
+
+/**
+ * Arrow-key navigation over a tree: Up = parent, Down = the child
+ * nearest below, Left/Right = previous/next sibling. Returns whether
+ * the key was handled (a single tree node was selected).
+ */
+function navigateTree(key: string): boolean {
+  const n = editor.singleSelectedNode();
+  if (!n || !editor.isTreeMember(n.id)) return false;
+  const parentEdge = treeParentEdgeOf(n.id);
+  let target: import("@orim/schema").Node | null | undefined = null;
+
+  if (key === "ArrowUp") {
+    target = parentEdge && store.getNode(parentEdge.from.node);
+  } else if (key === "ArrowDown") {
+    const kids = treeChildrenOf(n.id);
+    const cx = n.x + n.w / 2;
+    target = kids.reduce<import("@orim/schema").Node | null>(
+      (best, k) =>
+        !best || Math.abs(k.x + k.w / 2 - cx) < Math.abs(best.x + best.w / 2 - cx) ? k : best,
+      null,
+    );
+  } else if (key === "ArrowLeft" || key === "ArrowRight") {
+    if (!parentEdge) return true; // a root has no siblings; swallow the key
+    const siblings = treeChildrenOf(parentEdge.from.node);
+    const i = siblings.findIndex((s) => s.id === n.id);
+    target = key === "ArrowLeft" ? siblings[i - 1] : siblings[i + 1];
+  }
+
+  if (target) {
+    editor.clearSelection();
+    editor.selection.add(target.id);
+    ensureOnScreen(target);
+    dataPanel.scheduleRefresh();
+  }
+  return true;
+}
+
 /**
  * Add a connected child under `parentId` and rebalance that whole tree
  * with the tidy layout. New siblings inherit the last child's look, a
@@ -655,6 +701,7 @@ window.addEventListener("keydown", (e) => {
   if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable) {
     return; // form fields (data panel, frame rename) own their keys
   }
+  if (t.closest?.("#a11y-mirror")) return; // the mirror owns its own arrows
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key.toLowerCase();
 
@@ -702,6 +749,8 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       addTreeChild(parentEdge.from.node);
     }
+  } else if (e.key.startsWith("Arrow")) {
+    if (navigateTree(e.key)) e.preventDefault();
   } else if (e.key === "Escape") {
     editor.clearSelection();
     editor.tool = "select";
