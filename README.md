@@ -34,8 +34,9 @@ decision.
   keyboard shortcut set
 
 **Multiplayer & persistence**
-- Real-time collaboration via Yjs CRDTs (field-level last-writer-wins) with
-  presence cursors
+- Real-time collaboration via Yjs CRDTs with presence cursors —
+  field-level merges for objects, **cell-level for tables**, so two
+  people editing different cells simultaneously both win
 - **Local-first**: boards live in IndexedDB and work fully offline; the sync
   server (Hocuspocus + SQLite) is an accelerator, not a requirement
 - A board URL is a share link (`?b=<name>`)
@@ -229,8 +230,7 @@ what a screen reader hears is what an agent reads.
 ## Status
 
 Early and moving fast — see [PLAN.md](PLAN.md) for the full thesis, roadmap
-and honest gap list (comments/roles, format spec site, per-cell CRDT for
-tables, VoiceOver audit). Sample data and the import-inference regression
+and honest gap list (VoiceOver audit). Sample data and the import-inference regression
 check live in [`samples/`](samples/).
 
 License: the board format, schema and all converters are **MIT**; the

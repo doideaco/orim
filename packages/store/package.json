@@ -12,6 +12,7 @@
     "yjs": "^13.6.20"
   },
   "devDependencies": {
+    "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }
 }
