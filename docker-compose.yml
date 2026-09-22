@@ -1,0 +1,25 @@
+# Orim — self-hosted deployment.
+#   docker compose up -d       → http://localhost:1234
+# Backup = copy the orim-data volume (a single SQLite file).
+services:
+  orim:
+    build: .
+    ports:
+      - "1234:1234"
+    volumes:
+      - orim-data:/data
+    environment:
+      # Where users reach Orim (needed for SSO redirects):
+      # ORIM_PUBLIC_URL: https://orim.internal.example
+      # Session lifetime (hours, default 720 = 30 days):
+      # ORIM_SESSION_TTL_HOURS: "12"
+      # OIDC single sign-on (optional; see SECURITY.md):
+      # ORIM_OIDC_ISSUER: https://login.example.com/realms/main
+      # ORIM_OIDC_CLIENT_ID: orim
+      # ORIM_OIDC_CLIENT_SECRET: change-me
+      # ORIM_OIDC_REQUIRED: "1"   # disable password auth entirely
+      {}
+    restart: unless-stopped
+
+volumes:
+  orim-data:

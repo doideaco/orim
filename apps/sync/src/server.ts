@@ -7,13 +7,15 @@
  *   read-only connections, private boards reject strangers.
  * - A minimal HTTP API for the start page and share dialog.
  */
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { Server } from "@hocuspocus/server";
 import { Database } from "@hocuspocus/extension-database";
 import * as Y from "yjs";
+import { beginLogin, handleCallback, oidcConfig } from "./oidc";
+import { serveStatic } from "./static";
 
 const port = Number(process.env.PORT ?? 1234);
 const dataDir = process.env.ORIM_DATA_DIR ?? new URL("../.data", import.meta.url).pathname;
@@ -48,7 +50,35 @@ db.exec(`
     role TEXT NOT NULL,
     PRIMARY KEY (board, user_id)
   );
+  CREATE TABLE IF NOT EXISTS audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at INTEGER NOT NULL,
+    user TEXT NOT NULL,
+    action TEXT NOT NULL,
+    board TEXT,
+    detail TEXT
+  );
+  CREATE TABLE IF NOT EXISTS oidc_state (
+    state TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL
+  );
 `);
+try {
+  db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
+} catch { /* column exists */ }
+
+/** Append-only audit trail — regulated buyers ask on day one. */
+const auditStmt = db.prepare(
+  "INSERT INTO audit (at, user, action, board, detail) VALUES (?, ?, ?, ?, ?)",
+);
+function audit(user: string, action: string, board?: string | null, detail?: string): void {
+  auditStmt.run(Date.now(), user, action, board?.replace(/^orim-/, "") ?? null, detail ?? null);
+}
+
+const oidc = oidcConfig();
+const webDist = process.env.ORIM_WEB_DIST ?? "";
+const SESSION_TTL =
+  Number(process.env.ORIM_SESSION_TTL_HOURS ?? 24 * 30) * 3600_000;
 const selectStmt = db.prepare("SELECT state FROM boards WHERE name = ?");
 const upsertStmt = db.prepare(`
   INSERT INTO boards (name, state, updated_at) VALUES (?, ?, ?)
@@ -70,14 +100,42 @@ const verifyPassword = (password: string, stored: string): boolean => {
   return timingSafeEqual(scryptSync(password, salt, 32), Buffer.from(hash, "hex"));
 };
 
-function userForToken(token: string | null): User | null {
+interface SessionUser extends User { isAdmin: boolean }
+
+function userForToken(token: string | null): SessionUser | null {
   if (!token || token === "guest") return null;
   const row = db
     .prepare(
-      "SELECT u.id, u.name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?",
+      `SELECT u.id, u.name, u.is_admin AS isAdmin, s.created_at AS at
+       FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`,
     )
-    .get(token) as User | undefined;
-  return row ?? null;
+    .get(token) as (User & { isAdmin: number; at: number }) | undefined;
+  if (!row) return null;
+  if (Date.now() - row.at > SESSION_TTL) {
+    db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+    return null;
+  }
+  return { id: row.id, name: row.name, isAdmin: row.isAdmin === 1 };
+}
+
+function createSession(userId: number): string {
+  const token = randomBytes(24).toString("hex");
+  db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)")
+    .run(token, userId, Date.now());
+  db.prepare("DELETE FROM sessions WHERE created_at < ?").run(Date.now() - SESSION_TTL);
+  return token;
+}
+
+/** Find-or-create for SSO identities; the first user ever becomes admin. */
+function upsertSsoUser(name: string): User {
+  const existing = db.prepare("SELECT id, name, pass FROM users WHERE name = ?").get(name) as
+    | { id: number; name: string; pass: string }
+    | undefined;
+  if (existing) return existing;
+  const isFirst = (db.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number }).n === 0;
+  db.prepare("INSERT INTO users (name, pass, created_at, is_admin) VALUES (?, 'oidc', ?, ?)")
+    .run(name, Date.now(), isFirst ? 1 : 0);
+  return db.prepare("SELECT id, name FROM users WHERE name = ?").get(name) as unknown as User;
 }
 
 const bearer = (request: IncomingMessage): string | null => {
@@ -164,11 +222,13 @@ const server = new Server({
     const user = userForToken(token || null);
     const access = accessFor(documentName, user);
     if (access.role === "none") {
+      audit(user?.name ?? "guest", "connect.denied", documentName);
       throw new Error("This board is private.");
     }
     if (access.role === "viewer") {
       connectionConfig.readOnly = true;
     }
+    audit(user?.name ?? "guest", "connect", documentName, access.role);
     return { user: user?.name ?? "guest", role: access.role };
   },
 
@@ -188,13 +248,57 @@ const server = new Server({
       // eslint-disable-next-line prefer-promise-reject-errors
       return Promise.reject();
     };
-    const api = url.pathname.startsWith("/boards") || url.pathname.startsWith("/auth");
-    if (!api) return Promise.resolve();
+    const redirect = (location: string) => {
+      response.writeHead(302, { Location: location });
+      response.end();
+      // eslint-disable-next-line prefer-promise-reject-errors
+      return Promise.reject();
+    };
+
+    const api =
+      url.pathname.startsWith("/boards") ||
+      url.pathname.startsWith("/auth") ||
+      url.pathname.startsWith("/audit");
+    if (!api) {
+      // Single-container mode: serve the built web app.
+      if (webDist && request.method === "GET" && serveStatic(webDist, url.pathname, response)) {
+        // eslint-disable-next-line prefer-promise-reject-errors
+        return Promise.reject();
+      }
+      return Promise.resolve();
+    }
     if (request.method === "OPTIONS") return send(204, {});
 
     const user = userForToken(bearer(request));
 
     try {
+      // --- auth config & SSO ---
+      if (request.method === "GET" && url.pathname === "/auth/config") {
+        return send(200, {
+          oidc: !!oidc,
+          passwordAuth: !(oidc?.required),
+          provider: oidc ? new URL(oidc.issuer).hostname : null,
+        });
+      }
+      if (oidc && request.method === "GET" && url.pathname === "/auth/oidc/login") {
+        return redirect(await beginLogin(db, oidc));
+      }
+      if (oidc && request.method === "GET" && url.pathname === "/auth/oidc/callback") {
+        const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+        if (!code || !state) return send(400, { error: "code and state required" });
+        const name = await handleCallback(db, oidc, code, state);
+        const account = upsertSsoUser(name);
+        const token = createSession(account.id);
+        audit(name, "auth.sso");
+        return redirect(
+          `${oidc.publicUrl}/#sso=${token}&user=${encodeURIComponent(account.name)}`,
+        );
+      }
+      if (oidc?.required && ["/auth/signup", "/auth/login"].includes(url.pathname)) {
+        return send(403, { error: "Password sign-in is disabled — use SSO." });
+      }
+
       // --- auth ---
       if (request.method === "POST" && url.pathname === "/auth/signup") {
         const { name, password } = JSON.parse(await readBody(request)) as {
@@ -204,16 +308,17 @@ const server = new Server({
         if (!/^[\w .-]{2,32}$/.test(clean) || !password || password.length < 4) {
           return send(400, { error: "Name (2–32 chars) and password (4+ chars) required." });
         }
+        const isFirst =
+          (db.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number }).n === 0;
         try {
-          db.prepare("INSERT INTO users (name, pass, created_at) VALUES (?, ?, ?)")
-            .run(clean, hashPassword(password), Date.now());
+          db.prepare("INSERT INTO users (name, pass, created_at, is_admin) VALUES (?, ?, ?, ?)")
+            .run(clean, hashPassword(password), Date.now(), isFirst ? 1 : 0);
         } catch {
           return send(409, { error: "That name is taken." });
         }
         const id = (db.prepare("SELECT id FROM users WHERE name = ?").get(clean) as { id: number }).id;
-        const token = randomBytes(24).toString("hex");
-        db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)")
-          .run(token, id, Date.now());
+        const token = createSession(id);
+        audit(clean, "auth.signup", null, isFirst ? "admin" : undefined);
         return send(200, { token, name: clean });
       }
       if (request.method === "POST" && url.pathname === "/auth/login") {
@@ -222,21 +327,39 @@ const server = new Server({
         };
         const row = db.prepare("SELECT id, name, pass FROM users WHERE name = ?")
           .get((name ?? "").trim()) as { id: number; name: string; pass: string } | undefined;
+        if (row?.pass === "oidc") {
+          return send(401, { error: "This account signs in with SSO." });
+        }
         if (!row || !password || !verifyPassword(password, row.pass)) {
+          audit((name ?? "?").trim(), "auth.login.failed");
           return send(401, { error: "Wrong name or password." });
         }
-        const token = randomBytes(24).toString("hex");
-        db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)")
-          .run(token, row.id, Date.now());
+        const token = createSession(row.id);
+        audit(row.name, "auth.login");
         return send(200, { token, name: row.name });
       }
       if (request.method === "POST" && url.pathname === "/auth/logout") {
         const token = bearer(request);
         if (token) db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+        if (user) audit(user.name, "auth.logout");
         return send(200, { ok: true });
       }
       if (request.method === "GET" && url.pathname === "/auth/me") {
-        return user ? send(200, { name: user.name }) : send(401, { error: "not signed in" });
+        return user
+          ? send(200, { name: user.name, isAdmin: user.isAdmin })
+          : send(401, { error: "not signed in" });
+      }
+
+      // --- audit trail (admins only) ---
+      if (request.method === "GET" && url.pathname === "/audit") {
+        if (!user?.isAdmin) return send(403, { error: "admin only" });
+        const limit = Math.min(1000, Number(url.searchParams.get("limit") ?? 200));
+        const board = url.searchParams.get("board");
+        const rows = board
+          ? db.prepare("SELECT * FROM audit WHERE board = ? ORDER BY id DESC LIMIT ?")
+              .all(board, limit)
+          : db.prepare("SELECT * FROM audit ORDER BY id DESC LIMIT ?").all(limit);
+        return send(200, rows);
       }
 
       // --- boards ---
@@ -284,6 +407,7 @@ const server = new Server({
            ON CONFLICT(board) DO UPDATE SET mode = excluded.mode,
              owner_id = COALESCE(board_settings.owner_id, excluded.owner_id)`,
         ).run(docName(board), modeVal, user?.id ?? null);
+        audit(user?.name ?? "guest", "board.share", docName(board), modeVal);
         return send(200, accessFor(docName(board), user));
       }
       if (request.method === "POST" && url.pathname === "/boards/grant") {
@@ -308,6 +432,7 @@ const server = new Server({
              ON CONFLICT(board, user_id) DO UPDATE SET role = excluded.role`,
           ).run(docName(board), target.id, roleVal);
         }
+        audit(user?.name ?? "guest", "board.grant", docName(board), `${name}=${roleVal}`);
         return send(200, { ok: true });
       }
       if (request.method === "DELETE" && url.pathname === "/boards") {
@@ -317,6 +442,7 @@ const server = new Server({
         db.prepare("DELETE FROM boards WHERE name = ?").run(docName(name));
         db.prepare("DELETE FROM board_settings WHERE board = ?").run(docName(name));
         db.prepare("DELETE FROM board_roles WHERE board = ?").run(docName(name));
+        audit(user?.name ?? "guest", "board.delete", docName(name));
         return send(200, { ok: true });
       }
       if (request.method === "POST" && url.pathname === "/boards/rename") {
@@ -328,6 +454,7 @@ const server = new Server({
         db.prepare("UPDATE boards SET name = ? WHERE name = ?").run(docName(to), docName(from));
         db.prepare("UPDATE board_settings SET board = ? WHERE board = ?").run(docName(to), docName(from));
         db.prepare("UPDATE board_roles SET board = ? WHERE board = ?").run(docName(to), docName(from));
+        audit(user?.name ?? "guest", "board.rename", docName(from), `-> ${to}`);
         return send(200, { ok: true });
       }
       return send(404, { error: "not found" });

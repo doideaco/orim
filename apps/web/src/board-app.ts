@@ -20,7 +20,7 @@ import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
 import { ORIM_CLIP_MARKER, setupFileDrop, setupPaste } from "./import-drop";
 import { CommentsUI } from "./comments-ui";
-import { api, authName, authToken, openAuthDialog } from "./auth";
+import { api, authName, authToken, openAuthDialog, WS_URL } from "./auth";
 import { findEmptySpace } from "@orim/layout";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
@@ -309,7 +309,7 @@ function openFieldChipEditor(node: import("@orim/schema").Node, key: string): vo
 // --- sync --------------------------------------------------------------------
 
 const provider = new HocuspocusProvider({
-  url: "ws://localhost:1234",
+  url: WS_URL,
   name: BOARD,
   document: doc,
   token: authToken(),

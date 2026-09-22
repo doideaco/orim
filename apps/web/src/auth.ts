@@ -2,7 +2,27 @@
  * Client-side auth: token storage, API helpers, and a small sign-in /
  * sign-up dialog shared by the start page and the board app.
  */
-export const API = "http://localhost:1234";
+/** In dev the sync server runs separately; in the single-container
+ *  deployment the app is served BY the sync server, so URLs are relative. */
+export const API = import.meta.env.DEV ? "http://localhost:1234" : "";
+
+export const WS_URL = import.meta.env.DEV
+  ? "ws://localhost:1234"
+  : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+
+export interface AuthConfig {
+  oidc: boolean;
+  passwordAuth: boolean;
+  provider: string | null;
+}
+
+export async function authConfig(): Promise<AuthConfig> {
+  try {
+    return await api<AuthConfig>("GET", "/auth/config");
+  } catch {
+    return { oidc: false, passwordAuth: true, provider: null };
+  }
+}
 
 export const authToken = (): string => localStorage.getItem("orim-token") ?? "guest";
 export const authName = (): string | null => localStorage.getItem("orim-user");
@@ -45,16 +65,33 @@ export function openAuthDialog(): Promise<string | null> {
     backdrop.innerHTML = `
       <div class="dialog panel" role="dialog" aria-label="Sign in">
         <h3 id="auth-title">Sign in</h3>
-        <input id="auth-name" placeholder="Name" autocomplete="username" />
-        <input id="auth-pass" placeholder="Password" type="password" autocomplete="current-password" />
-        <div class="err" id="auth-err"></div>
-        <div class="row">
-          <button class="primary" id="auth-submit">Sign in</button>
-          <button id="auth-cancel">Cancel</button>
+        <button class="primary" id="auth-sso" hidden>Sign in with SSO</button>
+        <div id="auth-password-form">
+          <input id="auth-name" placeholder="Name" autocomplete="username" />
+          <input id="auth-pass" placeholder="Password" type="password" autocomplete="current-password" />
+          <div class="err" id="auth-err"></div>
+          <div class="row">
+            <button class="primary" id="auth-submit">Sign in</button>
+            <button id="auth-cancel">Cancel</button>
+          </div>
+          <button class="link" id="auth-flip">New here? Create an account</button>
         </div>
-        <button class="link" id="auth-flip">New here? Create an account</button>
       </div>`;
     document.body.appendChild(backdrop);
+
+    void authConfig().then((cfg) => {
+      const sso = backdrop.querySelector<HTMLButtonElement>("#auth-sso")!;
+      if (cfg.oidc) {
+        sso.hidden = false;
+        if (cfg.provider) sso.textContent = `Sign in with SSO (${cfg.provider})`;
+        sso.addEventListener("click", () => {
+          location.href = `${API}/auth/oidc/login`;
+        });
+      }
+      if (!cfg.passwordAuth) {
+        backdrop.querySelector<HTMLElement>("#auth-password-form")!.hidden = true;
+      }
+    });
 
     const $ = (id: string) => backdrop.querySelector<HTMLElement>(`#${id}`)!;
     const nameEl = $("auth-name") as HTMLInputElement;
@@ -94,6 +131,11 @@ export function openAuthDialog(): Promise<string | null> {
     backdrop.addEventListener("pointerdown", (e) => {
       if (e.target === backdrop) done(null);
     });
+    // The password form is inside a wrapper now; keep the row layout.
+    const form = backdrop.querySelector<HTMLElement>("#auth-password-form")!;
+    form.style.display = "flex";
+    form.style.flexDirection = "column";
+    form.style.gap = "10px";
     for (const el of [nameEl, passEl]) {
       el.addEventListener("keydown", (e) => {
         e.stopPropagation();
