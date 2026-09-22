@@ -32,6 +32,14 @@ const arrow = (id: string, from: string, to: string, label = ""): Connector => (
   to: { node: to, anchor: "auto" }, label, style: "arrow", index: "a0", data: {},
 });
 
+/** A reporting line: anchored bottom → top, which marks the diagram as a
+ *  tree — Tab/Enter authoring, the "+" affordance and arrow navigation
+ *  all key off this. */
+const reportingLine = (id: string, parent: string, child: string): Connector => ({
+  id, type: "connector", from: { node: parent, anchor: "s" },
+  to: { node: child, anchor: "n" }, label: "", style: "arrow", index: "a0", data: {},
+});
+
 export const TEMPLATES: TemplateDef[] = [
   {
     id: "retro",
@@ -124,7 +132,7 @@ export const TEMPLATES: TemplateDef[] = [
           shape(a, "rect", "Report", "blue", 0, 150),
           shape(b, "rect", "Report", "blue", 240, 150),
         ],
-        connectors: [arrow(newId(), root, a), arrow(newId(), root, b)],
+        connectors: [reportingLine(newId(), root, a), reportingLine(newId(), root, b)],
       };
     },
   },
