@@ -73,6 +73,9 @@ export class Renderer {
   private width = 0;
   private height = 0;
   private dpr = 1;
+  /** Fired when async content (images) finishes decoding — redraw. */
+  onNeedsRender: (() => void) | null = null;
+  private imageCache = new Map<NodeId, { src: string; img: HTMLImageElement; ready: boolean }>();
   private wrapCache = new Map<NodeId, { key: string; lines: string[] }>();
   private inkCache = new Map<NodeId, { key: number; path: Path2D }>();
   private routeCache = new Map<NodeId, { rev: number; route: Point[] | null }>();
@@ -166,6 +169,7 @@ export class Renderer {
       if (!drawDetail) {
         ctx.fillStyle =
           n.type === "ink" ? "#9CA3AF" :
+          n.type === "image" ? "#D9D9D5" :
           n.type === "table" || n.type === "embed" ? "#FFFFFF" :
           PALETTE[n.type === "text" ? "gray" : n.color].fill;
         if (n.type !== "text") ctx.fillRect(n.x, n.y, n.w, n.h);
@@ -225,6 +229,31 @@ export class Renderer {
         case "table":
           this.drawTable(n, z, drawText);
           break;
+        case "image": {
+          let entry = this.imageCache.get(n.id);
+          if (!entry || entry.src !== n.src) {
+            const img = new Image();
+            const next = { src: n.src, img, ready: false };
+            img.onload = () => {
+              next.ready = true;
+              this.onNeedsRender?.();
+            };
+            img.src = n.src;
+            this.imageCache.set(n.id, next);
+            entry = next;
+          }
+          this.path(n, "rect", 6);
+          if (entry.ready) {
+            ctx.save();
+            ctx.clip();
+            ctx.drawImage(entry.img, n.x, n.y, n.w, n.h);
+            ctx.restore();
+          } else {
+            ctx.fillStyle = "#EDEDEA";
+            ctx.fill();
+          }
+          break;
+        }
         case "embed": {
           // The live iframe is a DOM overlay; the canvas draws the card
           // it sits on (and the export/fallback presentation).

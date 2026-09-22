@@ -120,6 +120,17 @@ export const EmbedNode = BaseNode.extend({
 });
 export type EmbedNode = z.infer<typeof EmbedNode>;
 
+/** A bitmap on the canvas. The image itself lives in the document as a
+ *  data URL — local-first and air-gap safe, no blob store to run.
+ *  Imports downscale large files so documents stay portable. */
+export const ImageNode = BaseNode.extend({
+  type: z.literal("image"),
+  src: z.string(),
+  /** Alt text for exports and the accessibility tree. */
+  alt: z.string().default(""),
+});
+export type ImageNode = z.infer<typeof ImageNode>;
+
 export const Node = z.discriminatedUnion("type", [
   StickyNode,
   ShapeNode,
@@ -128,6 +139,7 @@ export const Node = z.discriminatedUnion("type", [
   InkNode,
   TableNode,
   EmbedNode,
+  ImageNode,
 ]);
 export type Node = z.infer<typeof Node>;
 export type NodeType = Node["type"];

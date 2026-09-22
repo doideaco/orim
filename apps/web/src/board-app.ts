@@ -70,6 +70,9 @@ function applyCurrency(): void {
 applyCurrency();
 const overlay = new TextEditorOverlay(document.getElementById("overlay-root")!);
 const embeds = new EmbedLayer(document.getElementById("overlay-root")!);
+renderer.onNeedsRender = () => {
+  dirty = true;
+};
 const minimapCanvas = document.getElementById("minimap-canvas") as HTMLCanvasElement;
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 

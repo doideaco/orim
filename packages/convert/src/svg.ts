@@ -159,6 +159,19 @@ export function boardToSVG(board: ExportBoard): string {
         parts.push(`<text x="${n.x + 1}" y="${n.y - 8}" font-family="${FONT}" font-size="13" font-weight="600" fill="#6B7280">${esc(n.title)}</text>`);
         break;
       }
+      case "image": {
+        // Data-URL images embed directly; SVG stays self-contained.
+        parts.push(
+          `<image x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" ` +
+          `href="${n.src}" preserveAspectRatio="none"><title>${esc(n.alt)}</title></image>`,
+        );
+        break;
+      }
+      case "embed": {
+        parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="10" fill="#FFFFFF" stroke="#C7C7C2" />`);
+        parts.push(`<text x="${n.x + 10}" y="${n.y + 24}" font-family="${FONT}" font-size="13" fill="#6B7280">${esc(n.url)}</text>`);
+        break;
+      }
       case "ink": {
         const pts: [number, number, number][] = [];
         for (let i = 0; i + 1 < n.points.length; i += 3) {

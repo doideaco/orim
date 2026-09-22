@@ -32,6 +32,8 @@ function describe(n: Node): string {
       return `Table "${n.title}": ${n.rows.length} rows, ${n.columns.length} columns`;
     case "frame":
       return `Frame "${n.title}"`;
+    case "image":
+      return `Image: ${n.alt || "no description"}`;
     case "embed": {
       try {
         return `Embedded page: ${new URL(n.url).hostname}`;

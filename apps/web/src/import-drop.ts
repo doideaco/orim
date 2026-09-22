@@ -99,6 +99,10 @@ export function setupFileDrop(deps: DropDeps): void {
     }
     e.preventDefault();
     const origin = toWorld(camera, { x: e.clientX, y: e.clientY });
+    if (file.type.startsWith("image/")) {
+      void insertImage(deps, file, origin);
+      return;
+    }
     void (async () => {
       try {
         const grid = await gridFromFile(file);
@@ -119,6 +123,59 @@ export function setupFileDrop(deps: DropDeps): void {
       }
     })();
   });
+}
+
+/**
+ * A dropped or pasted image becomes an image node. Bitmaps live in the
+ * document as data URLs (local-first, air-gap safe), so big files are
+ * downscaled to keep boards portable.
+ */
+const IMAGE_MAX_EDGE = 1600;
+const IMAGE_MAX_BYTES = 1_500_000;
+
+async function imageToDataUrl(file: File): Promise<string | null> {
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return null;
+  const scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  // PNG keeps transparency; everything else compresses better as JPEG.
+  const url = file.type === "image/png" || file.type === "image/svg+xml"
+    ? canvas.toDataURL("image/png")
+    : canvas.toDataURL("image/jpeg", 0.85);
+  if (url.length <= IMAGE_MAX_BYTES) return url;
+  const jpeg = canvas.toDataURL("image/jpeg", 0.7);
+  return jpeg.length <= IMAGE_MAX_BYTES ? jpeg : null;
+}
+
+async function insertImage(
+  deps: DropDeps,
+  file: File,
+  at: { x: number; y: number },
+): Promise<void> {
+  const src = await imageToDataUrl(file);
+  if (!src) {
+    deps.onError(`Couldn't add ${file.name} — unreadable or too large even after downscaling.`);
+    return;
+  }
+  const probe = new Image();
+  probe.src = src;
+  await probe.decode().catch(() => { /* draw anyway */ });
+  const natural = { w: probe.naturalWidth || 480, h: probe.naturalHeight || 320 };
+  const scale = Math.min(1, 480 / natural.w, 480 / natural.h);
+  const node: Node = {
+    id: deps.newId(), type: "image", parent: null,
+    x: at.x - (natural.w * scale) / 2, y: at.y - (natural.h * scale) / 2,
+    w: Math.max(24, natural.w * scale), h: Math.max(24, natural.h * scale),
+    rotation: 0, index: deps.store.topIndex(), locked: false, data: {},
+    src, alt: file.name.replace(/\.[^.]+$/, ""),
+  };
+  deps.store.upsertNode(node);
+  deps.editor.selectOnly(node.id);
+  deps.onDone(`Added image ${file.name}`);
 }
 
 /** A single pasted/dropped http(s) URL becomes a live embed node. */
@@ -154,6 +211,18 @@ export function setupPaste(
   const { store, camera } = deps;
   window.addEventListener("paste", (e) => {
     if (deps.isEditing()) return;
+    // A pasted/copied image (screenshot, image from another app).
+    const imageItem = [...(e.clipboardData?.items ?? [])]
+      .find((item) => item.type.startsWith("image/"));
+    const imageFile = imageItem?.getAsFile();
+    if (imageFile && deps.canEdit()) {
+      e.preventDefault();
+      void insertImage(deps, imageFile, toWorld(camera, {
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      }));
+      return;
+    }
     const text = e.clipboardData?.getData("text/plain") ?? "";
     e.preventDefault();
     if (!text.trim() || text === ORIM_CLIP_MARKER) {

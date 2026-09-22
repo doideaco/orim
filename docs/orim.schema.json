@@ -487,6 +487,62 @@
             "url"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/id"
+            },
+            "parent": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/parent"
+            },
+            "x": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/x"
+            },
+            "y": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/y"
+            },
+            "w": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/w"
+            },
+            "h": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/h"
+            },
+            "rotation": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/rotation"
+            },
+            "index": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/index"
+            },
+            "locked": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/locked"
+            },
+            "data": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/data"
+            },
+            "type": {
+              "type": "string",
+              "const": "image"
+            },
+            "src": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "required": [
+            "id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "type",
+            "src"
+          ],
+          "additionalProperties": false
         }
       ]
     },
