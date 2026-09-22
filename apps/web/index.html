@@ -191,6 +191,42 @@
       #menu-dropdown button.active { background: var(--accent); color: #fff; }
 
       #datapanel .view-toggle { margin: 10px 14px 0; }
+      .rules-block { margin: 0 14px 4px; }
+      .rules-head {
+        display: flex; align-items: center; justify-content: space-between;
+        font-size: 11px; font-weight: 600;
+        letter-spacing: 0.05em; text-transform: uppercase;
+        color: #9ca3af;
+        margin-bottom: 6px;
+      }
+      .rules-head button {
+        font: inherit; font-size: 11px; font-weight: 500;
+        text-transform: none; letter-spacing: 0;
+        border: 1px solid var(--border);
+        background: #fff; border-radius: 7px;
+        padding: 2px 8px; cursor: pointer;
+      }
+      .rules-head button:hover { background: #f3f3f1; }
+      .rules-list { display: flex; flex-direction: column; gap: 4px; }
+      .rule-row {
+        display: grid;
+        grid-template-columns: 1fr 58px 62px 66px 18px;
+        gap: 4px; align-items: center;
+      }
+      .rule-row input, .rule-row select {
+        font: inherit; font-size: 11.5px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 6px;
+        min-width: 0;
+        background: #fff;
+      }
+      .rule-row button {
+        border: none; background: none;
+        color: #9ca3af; cursor: pointer;
+        font-size: 14px; padding: 0;
+      }
+      .rule-row button:hover { color: #dc2626; }
       #datapanel .code-view {
         flex: 1;
         display: flex; flex-direction: column;

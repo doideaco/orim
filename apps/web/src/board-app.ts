@@ -2031,6 +2031,7 @@ function frame(): void {
           ? editor.hoveredId ?? editor.singleSelectedNode()?.id ?? null
           : null,
       bindCell: editor.draftBindCell,
+      colorRules: src.getMeta<import("@orim/editor").ColorRule[]>("colorRules") ?? [],
       treePlusFor: (() => {
         if (readOnly || editor.tool !== "select") return null;
         const n = editor.singleSelectedNode();

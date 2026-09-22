@@ -9,6 +9,7 @@ import {
 } from "@orim/schema";
 import { findEmptySpace, synthesizeTable } from "@orim/layout";
 import { feedOf, linkTableFeed, refreshTableFeed, unlinkTableFeed } from "./table-feed";
+import type { ColorRule } from "@orim/editor";
 import { noticeDialog, promptDialog } from "./dialogs";
 import { orderBoard, nodeLabel, type ExportBoard } from "@orim/convert";
 import { PALETTE } from "@orim/renderer";
@@ -52,6 +53,91 @@ export class DataPanel {
     this.currencySelect = select;
     settings.append(label, select);
     this.outline.before(settings);
+
+    // Conditional colors: when a field matches, tint the note — evaluated
+    // at render time, first rule wins, the authored color is untouched.
+    const rulesBlock = document.createElement("div");
+    rulesBlock.className = "rules-block";
+    const rulesHead = document.createElement("div");
+    rulesHead.className = "rules-head";
+    const rulesTitle = document.createElement("span");
+    rulesTitle.textContent = "Conditional colors";
+    const addRule = document.createElement("button");
+    addRule.textContent = "+ Rule";
+    rulesHead.append(rulesTitle, addRule);
+    const rulesList = document.createElement("div");
+    rulesList.className = "rules-list";
+    rulesBlock.append(rulesHead, rulesList);
+    settings.after(rulesBlock);
+
+    const OPS: ColorRule["op"][] = [">", ">=", "<", "<=", "=", "!=", "contains"];
+    const COLORS = ["red", "orange", "yellow", "green", "teal", "blue", "violet", "pink", "gray"] as const;
+    const readRules = (): ColorRule[] =>
+      (this.store.getMeta<ColorRule[]>("colorRules") ?? []).slice();
+    const writeRules = (rules: ColorRule[]): void => {
+      this.store.setMeta("colorRules", rules);
+      this.onChange();
+    };
+    this.renderRules = () => {
+      if (rulesList.contains(document.activeElement)) return; // mid-edit
+      rulesList.replaceChildren();
+      readRules().forEach((rule, i) => {
+        const row = document.createElement("div");
+        row.className = "rule-row";
+        const patch = (p: Partial<ColorRule>) => {
+          const rules = readRules();
+          rules[i] = { ...rules[i]!, ...p };
+          writeRules(rules);
+        };
+        const field = document.createElement("input");
+        field.placeholder = "field";
+        field.value = rule.field;
+        field.addEventListener("change", () => patch({ field: field.value.trim() }));
+        const op = document.createElement("select");
+        for (const o of OPS) {
+          const opt = document.createElement("option");
+          opt.value = o;
+          opt.textContent = o;
+          op.appendChild(opt);
+        }
+        op.value = rule.op;
+        op.addEventListener("change", () => patch({ op: op.value as ColorRule["op"] }));
+        const value = document.createElement("input");
+        value.placeholder = "value";
+        value.value = rule.value;
+        value.addEventListener("change", () => patch({ value: value.value }));
+        const color = document.createElement("select");
+        for (const c of COLORS) {
+          const opt = document.createElement("option");
+          opt.value = c;
+          opt.textContent = c;
+          color.appendChild(opt);
+        }
+        color.value = rule.color;
+        color.style.background = PALETTE[rule.color].fill;
+        color.addEventListener("change", () =>
+          patch({ color: color.value as ColorRule["color"] }),
+        );
+        const remove = document.createElement("button");
+        remove.textContent = "×";
+        remove.title = "Remove rule";
+        remove.addEventListener("click", () => {
+          const rules = readRules();
+          rules.splice(i, 1);
+          writeRules(rules);
+          this.renderRules();
+        });
+        row.append(field, op, value, color, remove);
+        rulesList.appendChild(row);
+      });
+      rulesBlock.classList.toggle("empty", !readRules().length);
+    };
+    addRule.addEventListener("click", () => {
+      writeRules([...readRules(), { field: "", op: ">", value: "", color: "red" }]);
+      this.renderRules();
+      rulesList.querySelector("input")?.focus();
+    });
+    this.renderRules();
 
     // Data ↔ Code: the same board as an outline or as live JSON.
     const viewToggle = document.createElement("div");
@@ -143,7 +229,10 @@ export class DataPanel {
     });
   }
 
+  private renderRules: () => void = () => {};
+
   refresh(): void {
+    this.renderRules();
     const meta = this.store.getMeta<string>("currency");
     this.currencySelect.value = meta === undefined ? "" : meta === "" ? "none" : meta;
 

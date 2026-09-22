@@ -1,9 +1,9 @@
 import type { Connector, Node, NodeId } from "@orim/schema";
 import {
-  elbowRoute, fieldChips, formatFieldValue, frameAggregates, nodeRect,
+  elbowRoute, fieldChips, formatFieldValue, frameAggregates, nodeRect, ruleColorFor,
   routeConnector, tableCellRect, tableColumnEdges, tableColumnTotals, visibleWorldRect,
   toScreen, CHIP_GAP_KV, CHIP_PAD, TABLE_ROW_H,
-  type Camera, type Point, type Rect,
+  type Camera, type ColorRule, type Point, type Rect,
 } from "@orim/editor";
 
 /** Chip font size; the chip measurer installed by the app must match. */
@@ -50,6 +50,8 @@ export interface Scene {
   treePlusFor: NodeId | null;
   /** Table cell a connector drop would bind to (drag highlight). */
   bindCell: { tableId: NodeId; rowIndex: number; colIndex: number } | null;
+  /** Conditional-color rules (board meta); render-time tint, first match wins. */
+  colorRules: readonly ColorRule[];
   /** Unresolved comments to draw as pins. */
   comments: BoardComment[];
   /** Vote totals per node; drawn as badges when present. */
@@ -171,14 +173,16 @@ export class Renderer {
           n.type === "ink" ? "#9CA3AF" :
           n.type === "image" ? "#D9D9D5" :
           n.type === "table" || n.type === "embed" ? "#FFFFFF" :
-          PALETTE[n.type === "text" ? "gray" : n.color].fill;
+          PALETTE[
+            n.type === "text" ? "gray" : ruleColorFor(n, scene.colorRules) ?? n.color
+          ].fill;
         if (n.type !== "text") ctx.fillRect(n.x, n.y, n.w, n.h);
         continue;
       }
 
       switch (n.type) {
         case "sticky": {
-          const color = PALETTE[n.color];
+          const color = PALETTE[ruleColorFor(n, scene.colorRules) ?? n.color];
           ctx.fillStyle = color.fill;
           this.path(n, "rect", 6);
           ctx.fill();
@@ -192,7 +196,7 @@ export class Renderer {
           break;
         }
         case "shape": {
-          const color = PALETTE[n.color];
+          const color = PALETTE[ruleColorFor(n, scene.colorRules) ?? n.color];
           this.path(n, n.kind, 8);
           if (n.fillStyle !== "none") {
             ctx.fillStyle = n.fillStyle === "solid" ? color.fill : CANVAS_BG;

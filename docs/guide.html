@@ -444,6 +444,13 @@ node --import tsx scripts/import-miro.mjs &lt;miro-board-id&gt;</code></pre></li
   grows an <b>aggregate chip</b> — no setup. Click the chip to cycle
   <b>Σ sum → average → min → max → count</b>. Sprint capacity, budget
   workshops and RICE scoring fall out for free.</p>
+  <h3>Conditional colors</h3>
+  <p>Spreadsheet-style formatting for the canvas: in the data panel,
+  add rules like <code>Cost &gt; 200000 → red</code> or
+  <code>status contains blocked → orange</code>. Rules are evaluated
+  live at render time — first match wins, the note's own color is never
+  overwritten, and edits that cross a threshold recolor instantly.
+  Rules sync with the board, so everyone sees the same signals.</p>
   <h3>Currency</h3>
   <p>Cost-shaped fields format with your currency. Set it once per board
   at the top of the data panel (auto picks from your locale).</p>

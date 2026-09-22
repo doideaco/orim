@@ -64,6 +64,9 @@ decision.
   Numeric table columns grow a totals footer. Sprint capacity, budget
   workshops and RICE scoring fall out for free, and agents can write
   fields over MCP ("estimate these 20 stickies")
+- **Conditional colors**: board-level rules (`Cost > 200000 → red`) tint
+  notes live as their data changes — first match wins, authored colors
+  untouched
 - Field values flow into Markdown exports and the accessibility tree
 
 **Import — the magic trick**

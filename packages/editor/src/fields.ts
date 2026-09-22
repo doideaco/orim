@@ -161,3 +161,42 @@ export function tableColumnTotals(
     })
     .filter((t) => t.count >= 2);
 }
+
+// --- conditional colors ------------------------------------------------------
+
+/** A conditional-color rule: when a node's field matches, tint it.
+ *  Rules live in board meta ("colorRules") and are evaluated at render
+ *  time — the authored color is never overwritten. First match wins. */
+export interface ColorRule {
+  field: string;
+  op: ">" | ">=" | "<" | "<=" | "=" | "!=" | "contains";
+  value: string;
+  color: import("@orim/schema").PaletteColor;
+}
+
+export function ruleColorFor(
+  n: Node,
+  rules: readonly ColorRule[] | undefined,
+): import("@orim/schema").PaletteColor | null {
+  if (!rules?.length || !("color" in n) || n.type === "ink") return null;
+  for (const r of rules) {
+    if (!r.field) continue;
+    const v = (n.data ?? {})[r.field];
+    if (v === undefined || v === null) continue;
+    const num = typeof v === "number" ? v : Number(v);
+    const target = Number(r.value);
+    const numeric = Number.isFinite(num) && Number.isFinite(target) && r.value.trim() !== "";
+    const sv = String(v).toLowerCase();
+    const tv = r.value.toLowerCase();
+    const hit =
+      r.op === ">" ? numeric && num > target :
+      r.op === ">=" ? numeric && num >= target :
+      r.op === "<" ? numeric && num < target :
+      r.op === "<=" ? numeric && num <= target :
+      r.op === "=" ? (numeric ? num === target : sv === tv) :
+      r.op === "!=" ? (numeric ? num !== target : sv !== tv) :
+      sv.includes(tv);
+    if (hit) return r.color;
+  }
+  return null;
+}
