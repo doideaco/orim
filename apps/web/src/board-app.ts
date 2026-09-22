@@ -1307,6 +1307,16 @@ refreshSwatchUI();
 // --- access & sharing --------------------------------------------------------
 
 const bareBoard = BOARD.replace(/^orim-/, "");
+
+// Board identity next to the logo; the project folder comes from the server.
+$("board-name").textContent = bareBoard;
+document.title = `${bareBoard} — Orim`;
+void api<{ name: string; project: string | null }[]>("GET", "/boards")
+  .then((rows) => {
+    const mine = rows.find((r) => r.name === bareBoard);
+    if (mine?.project) $("board-project").textContent = mine.project;
+  })
+  .catch(() => { /* offline: name alone is fine */ });
 let readOnly = false;
 interface AccessInfo { role: string; mode: string; ownerName: string | null }
 let access: AccessInfo = { role: "editor", mode: "link-edit", ownerName: null };

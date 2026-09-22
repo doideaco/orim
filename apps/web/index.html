@@ -547,6 +547,26 @@
         line-height: 0;
       }
       #logo { height: 21px; user-select: none; }
+      #logo-link {
+        display: flex; align-items: center; gap: 12px;
+        text-decoration: none;
+      }
+      #board-title {
+        display: flex; align-items: baseline; gap: 7px;
+        line-height: 1.2;
+        padding-left: 12px;
+        border-left: 1px solid var(--border);
+        max-width: 34vw;
+        white-space: nowrap; overflow: hidden;
+      }
+      #board-project { font-size: 12.5px; color: #9ca3af; }
+      #board-project:not(:empty)::after { content: "/"; margin-left: 7px; color: #d1d5db; }
+      #board-name {
+        font-size: 13.5px; font-weight: 600;
+        color: var(--ink);
+        overflow: hidden; text-overflow: ellipsis;
+      }
+      body.presenting #logo-link { display: none; }
 
       /* --- start page --- */
       body:has(#start) { overflow: auto; }
@@ -1082,7 +1102,7 @@
     <canvas id="canvas" aria-hidden="true"></canvas>
     <div id="overlay-root"></div>
 
-    <a id="logo-link" href="/" title="All boards"><img id="logo" src="/orim.svg" alt="Orim — all boards" /></a>
+    <a id="logo-link" href="/" title="All boards"><img id="logo" src="/orim.svg" alt="Orim — all boards" /><span id="board-title"><span id="board-project"></span><span id="board-name"></span></span></a>
 
     <div id="toolbar" class="panel">
       <button data-tool="select" title="Select — V"></button>
