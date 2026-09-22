@@ -3,6 +3,8 @@
 # Backup = copy the orim-data volume (a single SQLite file).
 services:
   orim:
+    # Published image; `docker compose build` rebuilds from source instead.
+    image: ghcr.io/doideaco/orim:latest
     build: .
     ports:
       - "1234:1234"

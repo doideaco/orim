@@ -1,7 +1,7 @@
 {
   "name": "orim",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "packageManager": "pnpm@9.15.5",
   "engines": {
     "node": ">=22.5"

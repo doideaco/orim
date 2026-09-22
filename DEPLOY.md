@@ -9,6 +9,10 @@ docker compose up -d
 # → http://localhost:1234
 ```
 
+This pulls the published image (`ghcr.io/doideaco/orim`, amd64 + arm64,
+tagged per release and `latest`). To build from source instead:
+`docker compose build && docker compose up -d`.
+
 Behind a reverse proxy (recommended), forward HTTP **and WebSocket**
 traffic to port 1234 and set `ORIM_PUBLIC_URL` to your public origin.
 
