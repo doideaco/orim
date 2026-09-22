@@ -206,7 +206,12 @@ function insertEmbed(deps: DropDeps, url: string, at: { x: number; y: number }):
 export const ORIM_CLIP_MARKER = "‹orim-internal-clipboard›";
 
 export function setupPaste(
-  deps: DropDeps & { isEditing(): boolean; internalPaste(): void },
+  deps: DropDeps & {
+    isEditing(): boolean;
+    internalPaste(): void;
+    /** Load serialized board objects copied in another board/tab. */
+    loadClipboard(json: string): boolean;
+  },
 ): void {
   const { store, camera } = deps;
   window.addEventListener("paste", (e) => {
@@ -225,7 +230,11 @@ export function setupPaste(
     }
     const text = e.clipboardData?.getData("text/plain") ?? "";
     e.preventDefault();
-    if (!text.trim() || text === ORIM_CLIP_MARKER) {
+    if (!text.trim() || text.startsWith(ORIM_CLIP_MARKER)) {
+      // Board objects: the payload after the marker makes paste work
+      // across boards; same-board paste falls back to the live buffer.
+      const payload = text.slice(ORIM_CLIP_MARKER.length);
+      if (payload) deps.loadClipboard(payload);
       deps.internalPaste();
       return;
     }

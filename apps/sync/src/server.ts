@@ -74,6 +74,9 @@ db.exec(`
 try {
   db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
 } catch { /* column exists */ }
+try {
+  db.exec("ALTER TABLE board_settings ADD COLUMN project TEXT");
+} catch { /* column exists */ }
 
 /** Append-only audit trail — regulated buyers ask on day one. */
 const auditStmt = db.prepare(
@@ -601,14 +604,59 @@ const server = new Server({
       // --- boards ---
       if (request.method === "GET" && url.pathname === "/boards") {
         const rows = db
-          .prepare("SELECT name, state, updated_at FROM boards ORDER BY updated_at DESC")
-          .all() as { name: string; state: Uint8Array; updated_at: number }[];
+          .prepare(
+            `SELECT b.name, b.state, b.updated_at, s.project
+             FROM boards b LEFT JOIN board_settings s ON s.board = b.name
+             ORDER BY b.updated_at DESC`,
+          )
+          .all() as {
+            name: string; state: Uint8Array; updated_at: number; project: string | null;
+          }[];
         const visible = rows.filter((r) => accessFor(r.name, user).role !== "none");
         return send(200, visible.map((r) => ({
           name: r.name.replace(/^orim-/, ""),
           updatedAt: r.updated_at,
+          project: r.project ?? null,
           ...previewOf(new Uint8Array(r.state)),
         })));
+      }
+      if (request.method === "POST" && url.pathname === "/boards/duplicate") {
+        const { from, to } = JSON.parse(await readBody(request)) as {
+          from?: string; to?: string;
+        };
+        if (!from || !to) return send(400, { error: "from and to required" });
+        if (accessFor(docName(from), user).role === "none") {
+          return send(403, { error: "no access" });
+        }
+        const src = selectStmt.get(docName(from)) as { state: Uint8Array } | undefined;
+        if (!src) return send(404, { error: "no such board" });
+        if (selectStmt.get(docName(to))) return send(409, { error: "target exists" });
+        upsertStmt.run(docName(to), src.state, Date.now());
+        // The copy lands in the same project, but unclaimed and link-edit.
+        const proj = db
+          .prepare("SELECT project FROM board_settings WHERE board = ?")
+          .get(docName(from)) as { project: string | null } | undefined;
+        if (proj?.project) {
+          db.prepare(
+            "INSERT INTO board_settings (board, mode, owner_id, project) VALUES (?, 'link-edit', NULL, ?)",
+          ).run(docName(to), proj.project);
+        }
+        audit(user?.name ?? "guest", "board.duplicate", docName(from), `-> ${to}`);
+        return send(200, { ok: true });
+      }
+      if (request.method === "POST" && url.pathname === "/boards/project") {
+        const { board, project } = JSON.parse(await readBody(request)) as {
+          board?: string; project?: string;
+        };
+        if (!board) return send(400, { error: "board required" });
+        if (!canManage(docName(board), user)) return send(403, { error: "owner only" });
+        const clean = (project ?? "").trim() || null;
+        db.prepare(
+          `INSERT INTO board_settings (board, mode, owner_id, project) VALUES (?, 'link-edit', NULL, ?)
+           ON CONFLICT(board) DO UPDATE SET project = excluded.project`,
+        ).run(docName(board), clean);
+        audit(user?.name ?? "guest", "board.project", docName(board), clean ?? "(none)");
+        return send(200, { ok: true });
       }
       // --- board history (append-only; anyone with board access can read) ---
       if (request.method === "GET" && url.pathname === "/boards/history") {

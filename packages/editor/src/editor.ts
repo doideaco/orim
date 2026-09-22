@@ -678,10 +678,22 @@ export class Editor {
   }
 
   copySelection(): void {
-    const nodes = [...this.selection]
+    const ids = new Set(this.selection);
+    // A copied frame brings its contents, selected or not (to fixpoint,
+    // so nested frames carry their own children too).
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const n of this.store.nodes.values()) {
+        if (n.parent && ids.has(n.parent) && !ids.has(n.id)) {
+          ids.add(n.id);
+          grew = true;
+        }
+      }
+    }
+    const nodes = [...ids]
       .map((id) => this.store.getNode(id))
       .filter((n): n is Node => !!n);
-    const ids = new Set(nodes.map((n) => n.id));
     const connectors = [...this.store.connectors.values()].filter(
       (c) =>
         "node" in c.from && ids.has(c.from.node) &&
@@ -690,28 +702,50 @@ export class Editor {
     if (nodes.length) this.clipboard = structuredClone({ nodes, connectors });
   }
 
+  /** The clipboard as JSON — written to the system clipboard so paste
+   *  works across boards (and browser tabs). */
+  serializeClipboard(): string | null {
+    return this.clipboard ? JSON.stringify(this.clipboard) : null;
+  }
+
+  loadClipboard(json: string): boolean {
+    try {
+      const parsed = JSON.parse(json) as { nodes?: Node[]; connectors?: Connector[] };
+      if (!Array.isArray(parsed.nodes)) return false;
+      this.clipboard = { nodes: parsed.nodes, connectors: parsed.connectors ?? [] };
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   paste(offset = 24): void {
     if (!this.clipboard) return;
     const idMap = new Map<string, string>();
+    for (const node of this.clipboard.nodes) idMap.set(node.id, this.hooks.newId());
     this.clearSelection();
     this.store.transact(() => {
       for (const node of this.clipboard!.nodes) {
-        const id = this.hooks.newId();
-        idMap.set(node.id, id);
+        const clone = structuredClone(node);
+        // A cell binding follows its table when the table is part of the
+        // copy (row/column ids survive the clone); otherwise it keeps
+        // pointing at the original cell.
+        const src = (clone.data as { $source?: { table: string } }).$source;
+        if (src && idMap.has(src.table)) src.table = idMap.get(src.table)!;
         this.store.upsertNode({
-          ...structuredClone(node),
-          id,
+          ...clone,
+          id: idMap.get(node.id)!,
           x: node.x + offset,
           y: node.y + offset,
-          parent: null,
+          parent: node.parent ? idMap.get(node.parent) ?? null : null,
           index: this.store.topIndex(),
         });
-        this.selection.add(id);
+        this.selection.add(idMap.get(node.id)!);
       }
       for (const c of this.clipboard!.connectors) {
         const remap = (e: Endpoint): Endpoint =>
           "node" in e
-            ? { node: idMap.get(e.node)!, anchor: e.anchor }
+            ? { node: idMap.get(e.node)!, anchor: e.anchor, row: e.row, column: e.column }
             : { point: { x: e.point.x + offset, y: e.point.y + offset } };
         this.store.upsertConnector({
           ...structuredClone(c),

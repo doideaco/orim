@@ -304,6 +304,7 @@ setupPaste({
       (t instanceof HTMLElement && t.isContentEditable)
     );
   },
+  loadClipboard: (json) => editor.loadClipboard(json),
   internalPaste: () => {
     editor.paste();
     dirty = true;
@@ -1091,7 +1092,10 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       editor.copySelection();
       // Mark the system clipboard so paste knows to use the internal buffer.
-      void navigator.clipboard?.writeText(ORIM_CLIP_MARKER).catch(() => {});
+      const payload = editor.serializeClipboard();
+      void navigator.clipboard
+        ?.writeText(ORIM_CLIP_MARKER + (payload ?? ""))
+        .catch(() => {});
     } else if (key === "d") {
       e.preventDefault();
       editor.duplicateSelection();

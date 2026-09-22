@@ -12,6 +12,7 @@ import { confirmDialog, noticeDialog, promptDialog } from "./dialogs";
 interface BoardInfo {
   name: string;
   updatedAt: number;
+  project: string | null;
   count: number;
   nodes: { x: number; y: number; w: number; h: number; type: string; color: PaletteColor | null }[];
 }
@@ -208,7 +209,7 @@ export async function renderStartPage(): Promise<void> {
   } catch {
     boards = recents()
       .sort((a, b) => b.at - a.at)
-      .map((r) => ({ name: r.name, updatedAt: r.at, count: 0, nodes: [] }));
+      .map((r) => ({ name: r.name, updatedAt: r.at, project: null, count: 0, nodes: [] }));
     if (boards.length) {
       const note = document.createElement("div");
       note.className = "hint";
@@ -222,7 +223,36 @@ export async function renderStartPage(): Promise<void> {
     grid.innerHTML = `<div class="hint">No boards yet — create one above.</div>`;
     return;
   }
+  // Boards group into projects (folders); unfiled boards come last.
+  const byProject = new Map<string, BoardInfo[]>();
   for (const info of boards) {
+    const key = info.project ?? "";
+    if (!byProject.has(key)) byProject.set(key, []);
+    byProject.get(key)!.push(info);
+  }
+  const projectNames = [...byProject.keys()].sort((a, b) => {
+    if (!a) return 1;
+    if (!b) return -1;
+    return a.localeCompare(b);
+  });
+  for (const project of projectNames) {
+    if (project || projectNames.length > 1) {
+      const title = document.createElement("h3");
+      title.className = "project-title";
+      title.textContent = project || "Unfiled";
+      grid.appendChild(title);
+    }
+    const projectGrid = document.createElement("div");
+    projectGrid.className = "board-grid";
+    grid.appendChild(projectGrid);
+    for (const info of byProject.get(project)!) {
+      projectGrid.appendChild(boardCard(info));
+    }
+  }
+}
+
+function boardCard(info: BoardInfo): HTMLElement {
+  {
     const card = document.createElement("div");
     card.className = "card board-card";
     const preview = document.createElement("canvas");
@@ -267,10 +297,47 @@ export async function renderStartPage(): Promise<void> {
       } catch { /* best effort */ }
       location.reload();
     });
-    actions.append(renameBtn, deleteBtn);
+    const duplicateBtn = document.createElement("button");
+    duplicateBtn.textContent = "Duplicate";
+    duplicateBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const to = await promptDialog({
+        title: "Duplicate board",
+        value: `${info.name}-copy`,
+        confirm: "Duplicate",
+      });
+      if (!to?.trim()) return;
+      const r = await fetch(`${API}/boards/duplicate`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ from: info.name, to: slugify(to) }),
+      });
+      if (!r.ok) await noticeDialog("Couldn't duplicate — does the target name already exist?");
+      location.reload();
+    });
+    const moveBtn = document.createElement("button");
+    moveBtn.textContent = "Move…";
+    moveBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const project = await promptDialog({
+        title: "Move to project",
+        placeholder: "Project name (empty = unfiled)",
+        value: info.project ?? "",
+        confirm: "Move",
+      });
+      if (project === null) return;
+      const r = await fetch(`${API}/boards/project`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ board: info.name, project }),
+      });
+      if (!r.ok) await noticeDialog("Only the board's owner can move it.");
+      location.reload();
+    });
+    actions.append(duplicateBtn, moveBtn, renameBtn, deleteBtn);
 
     card.append(preview, meta, actions);
     card.addEventListener("click", () => openBoard(info.name));
-    grid.appendChild(card);
+    return card;
   }
 }
