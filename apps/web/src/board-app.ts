@@ -996,6 +996,20 @@ function frame(): void {
   requestAnimationFrame(frame);
 }
 
+// Stats (fps, object count) are developer telemetry: hidden by default,
+// toggled by clicking the status chip, remembered per device.
+const statExtra = $("stat-extra");
+statExtra.hidden = localStorage.getItem("orim-stats") !== "1";
+$("statusbar").dataset.tip = "Connection — click for stats";
+$("statusbar").dataset.tipAt = "top";
+$("statusbar").removeAttribute("title");
+$("statusbar").addEventListener("click", () => {
+  statExtra.hidden = !statExtra.hidden;
+  try {
+    localStorage.setItem("orim-stats", statExtra.hidden ? "0" : "1");
+  } catch { /* private mode */ }
+});
+
 syncToolbar();
 setupTooltips();
 requestAnimationFrame(frame);

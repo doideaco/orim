@@ -600,7 +600,10 @@
         color: #6b7280;
         display: flex; align-items: center; gap: 8px;
         user-select: none;
+        cursor: pointer;
       }
+      #stat-extra { display: inline-flex; align-items: center; gap: 8px; }
+      #stat-extra[hidden] { display: none; }
       #status-dot {
         width: 7px; height: 7px; border-radius: 50%;
         background: #d1d5db;
@@ -699,13 +702,15 @@
 
     <div id="toast"></div>
 
-    <div id="statusbar" class="panel">
+    <div id="statusbar" class="panel" title="Connection — click for stats">
       <span id="status-dot"></span>
       <span id="stat-conn">offline</span>
-      <span>·</span>
-      <span id="stat-fps">–</span><span>fps</span>
-      <span>·</span>
-      <span id="stat-nodes">0</span><span>objects</span>
+      <span id="stat-extra" hidden>
+        <span>·</span>
+        <span id="stat-fps">–</span><span>fps</span>
+        <span>·</span>
+        <span id="stat-nodes">0</span><span>objects</span>
+      </span>
     </div>
 
     <script type="module" src="/src/main.ts"></script>
