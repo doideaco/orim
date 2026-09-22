@@ -167,6 +167,28 @@
       }
       #exportbar > button:hover { background: rgba(0, 0, 0, 0.06); }
       #exportbar > button.active { background: var(--accent); color: #fff; }
+      #menu-toggle svg { display: block; }
+      #menu-toggle[aria-expanded="true"] { background: rgba(0, 0, 0, 0.06); }
+      #menu-dropdown {
+        position: absolute;
+        top: calc(100% + 6px); right: 0;
+        display: flex; flex-direction: column;
+        min-width: 168px;
+        padding: 5px;
+      }
+      #menu-dropdown[hidden] { display: none; }
+      #menu-dropdown button {
+        font: inherit; font-size: 12.5px; font-weight: 500;
+        text-align: left;
+        display: flex; align-items: center; gap: 8px;
+        border: none; background: transparent;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        color: #40444f;
+      }
+      #menu-dropdown button:hover { background: rgba(0, 0, 0, 0.06); }
+      #menu-dropdown button.active { background: var(--accent); color: #fff; }
 
       #drafts-panel {
         position: fixed;
@@ -1040,14 +1062,19 @@
     </div>
 
     <div id="exportbar" class="panel">
-      <button id="btn-present" title="Present — each frame is a slide (→ / ← to move)">Present</button>
-      <button id="btn-timer" title="Shared timer">Timer</button>
-      <button id="btn-drafts" title="Private drafts — write ideas, reveal together">Drafts</button>
-      <button id="btn-vote" title="Dot voting">Vote</button>
-      <button id="btn-history" title="Board history — view and restore versions">History</button>
       <button id="btn-share" title="Share this board">Share</button>
-      <button id="btn-data" title="Board data — \">Data</button>
-      <button id="btn-export" title="Export the board">Export</button>
+      <button id="menu-toggle" aria-haspopup="true" aria-expanded="false" title="Board menu">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+      <div id="menu-dropdown" class="panel" hidden>
+        <button id="btn-present" title="Present — each frame is a slide (→ / ← to move)">Present</button>
+        <button id="btn-timer" title="Shared timer">Timer</button>
+        <button id="btn-drafts" title="Private drafts — write ideas, reveal together">Drafts</button>
+        <button id="btn-vote" title="Dot voting">Vote</button>
+        <button id="btn-history" title="Board history — view and restore versions">History</button>
+        <button id="btn-data" title="Board data — \">Data</button>
+        <button id="btn-export" title="Export the board">Export</button>
+      </div>
     </div>
 
     <div id="datapanel" class="panel">

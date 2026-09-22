@@ -765,6 +765,25 @@ function ensureOnScreen(n: { x: number; y: number; w: number; h: number }): void
   }
 }
 
+// --- board menu (burger dropdown for the secondary actions) ------------------
+
+const menuToggle = $("menu-toggle");
+const menuDropdown = $("menu-dropdown");
+function setMenuOpen(open: boolean): void {
+  menuDropdown.hidden = !open;
+  menuToggle.setAttribute("aria-expanded", String(open));
+}
+menuToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  setMenuOpen(menuDropdown.hidden);
+});
+menuDropdown.addEventListener("click", () => setMenuOpen(false));
+window.addEventListener("pointerdown", (e) => {
+  if (!menuDropdown.hidden && !(e.target as HTMLElement).closest?.("#exportbar")) {
+    setMenuOpen(false);
+  }
+});
+
 // --- board history (server-side snapshots; restore = ordinary edits) ---------
 
 interface HistoryRow { id: number; at: number; label: string | null; size: number }
