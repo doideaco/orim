@@ -232,6 +232,40 @@
     .deploy pre .c { color: #7b8496; }
     .deploy p { color: var(--muted); font-size: 14.5px; }
 
+    /* --- cost --- */
+    .cost-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+      align-items: stretch;
+    }
+    @media (max-width: 700px) { .cost-grid { grid-template-columns: 1fr; } }
+    .cost-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 26px;
+      box-shadow: 0 1px 2px rgba(15, 18, 25, 0.04);
+    }
+    .cost-card.win { border: 2px solid var(--accent); }
+    .cost-card .who {
+      font-size: 12px; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      color: var(--faint);
+      margin-bottom: 10px;
+    }
+    .cost-card .price {
+      font-size: clamp(26px, 3.6vw, 34px);
+      font-weight: 700; letter-spacing: -0.02em;
+      margin-bottom: 2px;
+    }
+    .cost-card.win .price { color: var(--accent); }
+    .cost-card .basis { font-size: 13px; color: var(--faint); margin-bottom: 16px; }
+    .cost-card ul { margin: 0; padding: 0; list-style: none; font-size: 14px; }
+    .cost-card li { padding: 5px 0 5px 24px; position: relative; color: var(--muted); }
+    .cost-card li::before { position: absolute; left: 0; font-weight: 600; }
+    .cost-card.lose li::before { content: "✕"; color: #d0687e; }
+    .cost-card.win li::before { content: "✓"; color: var(--accent); }
+    .cost-note { font-size: 12.5px; color: var(--faint); margin-top: 14px; }
+
     /* --- licensing --- */
     .license-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
 
@@ -263,6 +297,7 @@
       <a href="#inside">Architecture</a>
       <a href="#governed">Governance</a>
       <a href="#better">Features</a>
+      <a href="#cost">Pricing</a>
       <a href="#deploy">Deploy</a>
       <a class="btn" href="https://github.com/doideaco/orim">GitHub</a>
     </nav>
@@ -448,6 +483,7 @@ browser ── HTTPS/WSS (your proxy) ──► <b>orim</b>
           <tr><td>Screen-reader navigable boards</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
           <tr><td>Native MCP for agents</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
           <tr><td>Works offline</td><td class="yes">Local-first</td><td class="no">Limited</td><td class="no">No</td><td class="no">No</td></tr>
+          <tr><td>Pricing model</td><td class="yes">Per server</td><td class="no">Per seat</td><td class="no">Per seat</td><td class="no">Per seat</td></tr>
         </tbody>
       </table>
       <p class="compare-note">As of September 2026; based on each vendor's published offering.</p>
@@ -455,7 +491,48 @@ browser ── HTTPS/WSS (your proxy) ──► <b>orim</b>
   </div>
 </section>
 
-<section class="alt deploy" id="deploy">
+<section class="alt" id="cost">
+  <div class="wrap">
+    <h2>Priced like a server, not a census.</h2>
+    <p class="lede">
+      Per-seat pricing taxes the one thing a whiteboard is for: inviting
+      people in. So teams ration seats, and collaboration dies by
+      spreadsheet. Orim is licensed per server, by seat band — flat,
+      predictable, and procurement-shaped.
+    </p>
+    <div class="cost-grid">
+      <div class="cost-card lose">
+        <div class="who">Cloud whiteboard · 500-seat department</div>
+        <div class="price">≈ $120,000 / yr</div>
+        <div class="basis">at a typical ~$20 per user per month enterprise list price</div>
+        <ul>
+          <li>Grows with every hire, forever</li>
+          <li>Occasional viewers still burn seats</li>
+          <li>Seat audits and true-ups at renewal</li>
+          <li>And your data still lives in their cloud</li>
+        </ul>
+      </div>
+      <div class="cost-card win">
+        <div class="who">Orim · the same department</div>
+        <div class="price">£25–75k / yr, flat</div>
+        <div class="basis">one server licence, seat-banded, support SLA included</div>
+        <ul>
+          <li>Invite the whole department — the price doesn't move</li>
+          <li>Viewing never needs a licence, for anyone</li>
+          <li>One PO, one renewal, zero seat counting</li>
+          <li>The trial is the compose file — run it today</li>
+        </ul>
+      </div>
+    </div>
+    <p class="cost-note">
+      Indicative bands — smaller teams start around £10–20k/yr per 100
+      seats. Cloud figure based on published per-seat enterprise list
+      pricing, September 2026.
+    </p>
+  </div>
+</section>
+
+<section class="deploy" id="deploy">
   <div class="wrap">
     <h2>Deployed before the meeting starts.</h2>
     <p class="lede">One container, one port, one data volume. Upgrades are a pull; backups are a file.</p>
