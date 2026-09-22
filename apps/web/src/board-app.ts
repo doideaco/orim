@@ -1285,12 +1285,78 @@ for (const fill of ["solid", "outline", "none"] as const) {
   fillStylesEl.appendChild(btn);
 }
 
+// Conditional colors: rules live in synced board meta and tint notes at
+// render time by their data — the color home is the color popover.
+let renderRules: () => void = () => {};
+{
+  const rulesList = $("popover-rules");
+  const OPS: import("@orim/editor").ColorRule["op"][] = [">", ">=", "<", "<=", "=", "!=", "contains"];
+  const RULE_COLORS = ["red", "orange", "yellow", "green", "teal", "blue", "violet", "pink", "gray"] as const;
+  type Rule = import("@orim/editor").ColorRule;
+  const readRules = (): Rule[] => (store.getMeta<Rule[]>("colorRules") ?? []).slice();
+  const writeRules = (rules: Rule[]): void => {
+    store.setMeta("colorRules", rules);
+    dirty = true;
+  };
+  renderRules = () => {
+    rulesList.replaceChildren();
+    readRules().forEach((rule, i) => {
+      const row = document.createElement("div");
+      row.className = "rule-row";
+      const patch = (p: Partial<Rule>) => {
+        const rules = readRules();
+        rules[i] = { ...rules[i]!, ...p };
+        writeRules(rules);
+      };
+      const field = document.createElement("input");
+      field.placeholder = "field";
+      field.value = rule.field;
+      field.addEventListener("change", () => patch({ field: field.value.trim() }));
+      const op = document.createElement("select");
+      for (const o of OPS) op.add(new Option(o, o));
+      op.value = rule.op;
+      op.addEventListener("change", () => patch({ op: op.value as Rule["op"] }));
+      const value = document.createElement("input");
+      value.placeholder = "value";
+      value.value = rule.value;
+      value.addEventListener("change", () => patch({ value: value.value }));
+      const color = document.createElement("select");
+      color.className = "rule-color";
+      color.setAttribute("aria-label", "Rule color");
+      for (const c of RULE_COLORS) color.add(new Option(c, c));
+      color.value = rule.color;
+      color.style.background = PALETTE[rule.color].fill;
+      color.addEventListener("change", () => {
+        color.style.background = PALETTE[color.value as Rule["color"]].fill;
+        patch({ color: color.value as Rule["color"] });
+      });
+      const remove = document.createElement("button");
+      remove.textContent = "×";
+      remove.title = "Remove rule";
+      remove.addEventListener("click", () => {
+        const rules = readRules();
+        rules.splice(i, 1);
+        writeRules(rules);
+        renderRules();
+      });
+      row.append(field, op, value, color, remove);
+      rulesList.appendChild(row);
+    });
+  };
+  $("rule-add").addEventListener("click", () => {
+    writeRules([...readRules(), { field: "", op: ">", value: "", color: "red" }]);
+    renderRules();
+    rulesList.querySelector("input")?.focus();
+  });
+}
+
 swatchBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   const willOpen = !popover.classList.contains("open");
   popover.classList.toggle("open", willOpen);
   if (willOpen) {
     refreshSwatchUI();
+    renderRules();
     const r = swatchBtn.getBoundingClientRect();
     popover.style.left = `${r.right + 10}px`;
     popover.style.top = `${Math.min(r.top, window.innerHeight - 280)}px`;
