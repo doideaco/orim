@@ -82,8 +82,21 @@ export function setupFileDrop(deps: DropDeps): void {
   });
 
   window.addEventListener("drop", (e) => {
+    if (!deps.canEdit()) return;
     const file = e.dataTransfer?.files?.[0];
-    if (!file || !deps.canEdit()) return;
+    if (!file) {
+      // No file: a dragged link (from the address bar, a bookmark, another
+      // tab) becomes a live embed at the drop point.
+      const url = asUrl(
+        e.dataTransfer?.getData("text/uri-list")?.split("\n")[0] ??
+        e.dataTransfer?.getData("text/plain") ?? "",
+      );
+      if (url) {
+        e.preventDefault();
+        insertEmbed(deps, url, toWorld(camera, { x: e.clientX, y: e.clientY }));
+      }
+      return;
+    }
     e.preventDefault();
     const origin = toWorld(camera, { x: e.clientX, y: e.clientY });
     void (async () => {
@@ -108,6 +121,29 @@ export function setupFileDrop(deps: DropDeps): void {
   });
 }
 
+/** A single pasted/dropped http(s) URL becomes a live embed node. */
+const asUrl = (text: string): string | null => {
+  const t = text.trim();
+  return /^https?:\/\/\S+$/.test(t) && !t.includes("\n") ? t : null;
+};
+
+function insertEmbed(deps: DropDeps, url: string, at: { x: number; y: number }): void {
+  const { store, editor } = deps;
+  const node: Node = {
+    id: deps.newId(), type: "embed", parent: null,
+    x: at.x - 320, y: at.y - 200, w: 640, h: 400,
+    rotation: 0, index: store.topIndex(), locked: false, data: {},
+    url,
+  };
+  store.upsertNode(node);
+  editor.selectOnly(node.id);
+  let host = url;
+  try {
+    host = new URL(url).hostname;
+  } catch { /* keep full url */ }
+  deps.onDone(`Embedded ${host} — double-click to interact`);
+}
+
 /** Marker written to the system clipboard when board objects are copied,
  *  so paste can tell internal object-paste from external content. */
 export const ORIM_CLIP_MARKER = "‹orim-internal-clipboard›";
@@ -122,6 +158,14 @@ export function setupPaste(
     e.preventDefault();
     if (!text.trim() || text === ORIM_CLIP_MARKER) {
       deps.internalPaste();
+      return;
+    }
+    const url = asUrl(text);
+    if (url) {
+      insertEmbed(deps, url, toWorld(camera, {
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      }));
       return;
     }
     void (async () => {

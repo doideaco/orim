@@ -64,5 +64,6 @@ export function nodeLabel(n: Node): string {
     case "frame": return n.title;
     case "ink": return "(drawing)";
     case "table": return n.title;
+    case "embed": return n.url;
   }
 }

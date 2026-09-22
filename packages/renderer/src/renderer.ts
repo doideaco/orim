@@ -166,7 +166,7 @@ export class Renderer {
       if (!drawDetail) {
         ctx.fillStyle =
           n.type === "ink" ? "#9CA3AF" :
-          n.type === "table" ? "#FFFFFF" :
+          n.type === "table" || n.type === "embed" ? "#FFFFFF" :
           PALETTE[n.type === "text" ? "gray" : n.color].fill;
         if (n.type !== "text") ctx.fillRect(n.x, n.y, n.w, n.h);
         continue;
@@ -225,6 +225,28 @@ export class Renderer {
         case "table":
           this.drawTable(n, z, drawText);
           break;
+        case "embed": {
+          // The live iframe is a DOM overlay; the canvas draws the card
+          // it sits on (and the export/fallback presentation).
+          ctx.fillStyle = "#FFFFFF";
+          this.path(n, "rect", 10);
+          ctx.fill();
+          ctx.strokeStyle = "#D6D6D2";
+          ctx.lineWidth = 1 / z;
+          ctx.stroke();
+          if (drawText) {
+            let host = n.url;
+            try {
+              host = new URL(n.url).hostname;
+            } catch { /* leave as-is */ }
+            ctx.fillStyle = "#6b7280";
+            ctx.font = `500 12px ${FONT_STACK}`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText(`🌐 ${host}`, n.x + 2, n.y - 12);
+          }
+          break;
+        }
       }
 
       if (scene.selection.has(n.id)) {

@@ -16,6 +16,7 @@ import {
   type ExportBoard,
 } from "@orim/convert";
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
+import { EmbedLayer } from "./embed-layer";
 import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
 import { ORIM_CLIP_MARKER, setupFileDrop, setupPaste } from "./import-drop";
@@ -67,6 +68,7 @@ function applyCurrency(): void {
 }
 applyCurrency();
 const overlay = new TextEditorOverlay(document.getElementById("overlay-root")!);
+const embeds = new EmbedLayer(document.getElementById("overlay-root")!);
 const minimapCanvas = document.getElementById("minimap-canvas") as HTMLCanvasElement;
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
@@ -487,6 +489,10 @@ const info = (e: PointerEvent | MouseEvent) => ({
 
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 && e.button !== 1) return;
+  if (embeds.active) {
+    embeds.activate(null); // clicking the board hands the pointer back
+    dirty = true;
+  }
   if (editor.tool === "select" || editor.tool === "hand") {
     const pin = comments.pinAt({ x: e.clientX, y: e.clientY });
     if (pin) {
@@ -531,6 +537,14 @@ canvas.addEventListener("pointerup", (e) => {
 });
 
 canvas.addEventListener("dblclick", (e) => {
+  // Double-clicking an embed hands it the pointer (scroll, click links);
+  // Escape or clicking the canvas gives it back. Works for viewers too.
+  const hit = editor.hitNode(info(e).world);
+  if (hit?.type === "embed") {
+    embeds.activate(hit.id);
+    dirty = true;
+    return;
+  }
   if (readOnly) return;
   editor.dblClick(info(e));
   dirty = true;
@@ -789,6 +803,7 @@ window.addEventListener("keydown", (e) => {
   } else if (e.key.startsWith("Arrow")) {
     if (navigateTree(e.key)) e.preventDefault();
   } else if (e.key === "Escape") {
+    embeds.activate(null);
     editor.clearSelection();
     editor.tool = "select";
   } else if (key === "1") {
@@ -1680,6 +1695,7 @@ function frame(): void {
       draftColor: PALETTE[defaultColor].solid,
     });
     overlay.reposition(camera);
+    embeds.sync(store.nodesSorted, camera);
     comments.reposition();
     dirty = false;
   }

@@ -32,6 +32,13 @@ function describe(n: Node): string {
       return `Table "${n.title}": ${n.rows.length} rows, ${n.columns.length} columns`;
     case "frame":
       return `Frame "${n.title}"`;
+    case "embed": {
+      try {
+        return `Embedded page: ${new URL(n.url).hostname}`;
+      } catch {
+        return `Embedded page: ${n.url}`;
+      }
+    }
   }
 }
 

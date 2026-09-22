@@ -112,6 +112,14 @@ export const TableNode = BaseNode.extend({
 });
 export type TableNode = z.infer<typeof TableNode>;
 
+/** A live web page on the canvas (rendered as a sandboxed iframe).
+ *  The URL is the content; everything else is ordinary node geometry. */
+export const EmbedNode = BaseNode.extend({
+  type: z.literal("embed"),
+  url: z.string().url(),
+});
+export type EmbedNode = z.infer<typeof EmbedNode>;
+
 export const Node = z.discriminatedUnion("type", [
   StickyNode,
   ShapeNode,
@@ -119,6 +127,7 @@ export const Node = z.discriminatedUnion("type", [
   TextNode,
   InkNode,
   TableNode,
+  EmbedNode,
 ]);
 export type Node = z.infer<typeof Node>;
 export type NodeType = Node["type"];
