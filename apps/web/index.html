@@ -871,6 +871,37 @@
       #status-dot.connected { background: #22c55e; }
       #stat-fps { font-variant-numeric: tabular-nums; }
 
+      /* --- present mode --- */
+      body.presenting #toolbar,
+      body.presenting #exportbar,
+      body.presenting #zoombar,
+      body.presenting #minimap,
+      body.presenting #statusbar,
+      body.presenting #datapanel { display: none; }
+      #present-hud {
+        left: 50%; bottom: 18px;
+        transform: translateX(-50%);
+        z-index: 30;
+        display: flex; align-items: center; gap: 6px;
+        padding: 7px 10px;
+      }
+      #present-hud[hidden] { display: none; }
+      #present-hud button {
+        font: inherit; font-size: 13px;
+        border: none; background: transparent;
+        border-radius: 7px;
+        padding: 5px 10px;
+        cursor: pointer;
+        color: var(--ink);
+      }
+      #present-hud button:hover { background: #f0f0ee; }
+      #present-label {
+        font-size: 12.5px; color: #6b7280;
+        padding: 0 6px;
+        max-width: 40vw;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+
       .orim-embed {
         position: absolute;
         transform-origin: top left;
@@ -948,6 +979,7 @@
     </div>
 
     <div id="exportbar" class="panel">
+      <button id="btn-present" title="Present — each frame is a slide (→ / ← to move)">Present</button>
       <button id="btn-timer" title="Shared timer">Timer</button>
       <button id="btn-drafts" title="Private drafts — write ideas, reveal together">Drafts</button>
       <button id="btn-vote" title="Dot voting">Vote</button>
@@ -977,6 +1009,13 @@
     </div>
 
     <div id="minimap" class="panel"><canvas id="minimap-canvas" width="200" height="140"></canvas></div>
+
+    <div id="present-hud" class="panel" hidden>
+      <button id="present-prev" title="Previous frame (←)">←</button>
+      <span id="present-label"></span>
+      <button id="present-next" title="Next frame (→)">→</button>
+      <button id="present-exit" title="Stop presenting (Esc)">Exit</button>
+    </div>
 
     <div id="comment-panel" class="panel"></div>
 

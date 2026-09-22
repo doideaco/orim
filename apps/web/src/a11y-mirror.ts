@@ -168,6 +168,11 @@ export class A11yMirror {
     });
   }
 
+  /** Speak an app-level message (e.g. slide changes) via the live region. */
+  announce(message: string): void {
+    this.announcer.textContent = message;
+  }
+
   private rebuild(): void {
     const hadFocus = this.root.contains(document.activeElement);
     const board: ExportBoard = {

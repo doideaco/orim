@@ -97,8 +97,12 @@ decision.
 - **Private drafts**: write ideas only you can see, then reveal — or have
   the facilitator broadcast "everyone reveal" and all drafts land on the
   board simultaneously (the anti-anchoring move Miro charges for)
+- **Present mode**: every frame is a slide, in the board's reading order —
+  the camera glides between frames with arrow keys, chrome hides, and
+  slide changes are announced to screen readers. Workshops end with a
+  readout, not an export to PowerPoint
 - Cluster synthesis (above) closes the loop: draft privately → reveal →
-  cluster → vote → ranked actions
+  cluster → vote → ranked actions → present
 
 **Agent-native (MCP)**
 - A built-in MCP server exposes boards as structured data:

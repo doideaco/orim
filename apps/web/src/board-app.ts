@@ -12,7 +12,7 @@ import {
   type PresenceState,
 } from "@orim/renderer";
 import {
-  boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG, TEMPLATES,
+  boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG, orderBoard, TEMPLATES,
   type ExportBoard,
 } from "@orim/convert";
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
@@ -738,6 +738,85 @@ function ensureOnScreen(n: { x: number; y: number; w: number; h: number }): void
   }
 }
 
+// --- present mode (each frame is a slide, in reading order) ------------------
+
+let presenting = false;
+let presentIndex = 0;
+let cameraAnim: number | null = null;
+
+/** Frames in the same reading order exports and the a11y mirror use. */
+function presentFrames(): import("@orim/schema").FrameNode[] {
+  return orderBoard({
+    nodes: [...store.nodes.values()],
+    connectors: [...store.connectors.values()],
+  }).frames.map((f) => f.frame);
+}
+
+/** Glide the camera to a target (zoom eased exponentially). */
+function animateCamera(target: Camera, duration = 480): void {
+  if (cameraAnim !== null) cancelAnimationFrame(cameraAnim);
+  const from = { x: camera.x, y: camera.y, zoom: camera.zoom };
+  const t0 = performance.now();
+  const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+  const step = (now: number) => {
+    const t = Math.min(1, (now - t0) / duration);
+    const k = ease(t);
+    camera.zoom = from.zoom * (target.zoom / from.zoom) ** k;
+    camera.x = from.x + (target.x - from.x) * k;
+    camera.y = from.y + (target.y - from.y) * k;
+    dirty = true;
+    cameraAnim = t < 1 ? requestAnimationFrame(step) : null;
+  };
+  cameraAnim = requestAnimationFrame(step);
+}
+
+function presentGo(index: number): void {
+  const frames = presentFrames();
+  if (!frames.length) {
+    stopPresenting();
+    return;
+  }
+  presentIndex = Math.max(0, Math.min(frames.length - 1, index));
+  const f = frames[presentIndex]!;
+  // Include the title strip above the frame in the shot.
+  animateCamera(
+    cameraToFit(
+      { x: f.x, y: f.y - 32, w: f.w, h: f.h + 32 },
+      window.innerWidth, window.innerHeight, 72,
+    ),
+  );
+  $("present-label").textContent = `${presentIndex + 1} / ${frames.length} · ${f.title}`;
+  a11y.announce(`Slide ${presentIndex + 1} of ${frames.length}: ${f.title}`);
+}
+
+function startPresenting(): void {
+  if (presenting) return;
+  if (!presentFrames().length) {
+    toast("Add frames to present — each frame is a slide.", true);
+    return;
+  }
+  presenting = true;
+  document.body.classList.add("presenting");
+  ($("present-hud") as HTMLElement).hidden = false;
+  editor.clearSelection();
+  editor.tool = "select";
+  embeds.activate(null);
+  presentGo(0);
+}
+
+function stopPresenting(): void {
+  if (!presenting) return;
+  presenting = false;
+  document.body.classList.remove("presenting");
+  ($("present-hud") as HTMLElement).hidden = true;
+  dirty = true;
+}
+
+$("btn-present").addEventListener("click", startPresenting);
+$("present-prev").addEventListener("click", () => presentGo(presentIndex - 1));
+$("present-next").addEventListener("click", () => presentGo(presentIndex + 1));
+$("present-exit").addEventListener("click", stopPresenting);
+
 // --- keyboard ----------------------------------------------------------------
 
 const TOOL_KEYS: Record<string, ToolName> = {
@@ -755,6 +834,20 @@ window.addEventListener("keydown", (e) => {
   if (t.closest?.("#a11y-mirror")) return; // the mirror owns its own arrows
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key.toLowerCase();
+
+  // Present mode owns navigation keys (viewers can present too).
+  if (presenting) {
+    if (["ArrowRight", " ", "PageDown"].includes(e.key)) {
+      e.preventDefault();
+      presentGo(presentIndex + 1);
+    } else if (["ArrowLeft", "PageUp"].includes(e.key)) {
+      e.preventDefault();
+      presentGo(presentIndex - 1);
+    } else if (e.key === "Escape") {
+      stopPresenting();
+    }
+    return;
+  }
 
   if (readOnly && !["1", "0", "\\"].includes(key)) return;
 
