@@ -99,7 +99,7 @@ export class A11yMirror {
 
   private diffAndAnnounce(): void {
     const current = new Map<string, string>();
-    for (const n of this.store.nodes.values()) current.set(n.id, describe(n));
+    for (const n of this.store.nodes.values()) current.set(n.id, this.describeWithVotes(n));
     for (const c of this.store.connectors.values()) {
       current.set(c.id, this.connectorLabel(c));
     }
@@ -232,9 +232,14 @@ export class A11yMirror {
     }
   }
 
+  private describeWithVotes(n: Node): string {
+    const votes = this.store.voteTotals().get(n.id);
+    return votes ? `${describe(n)}, ${votes} vote${votes === 1 ? "" : "s"}` : describe(n);
+  }
+
   private buildNode(n: Node, level: number): HTMLElement {
     if (n.type === "table") return this.buildTable(n, level);
-    return this.makeItem(n, level, describe(n));
+    return this.makeItem(n, level, this.describeWithVotes(n));
   }
 
   private buildTable(t: TableNode, level: number): HTMLElement {

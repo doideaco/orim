@@ -156,6 +156,7 @@
         padding: 4px;
         display: flex; gap: 2px;
       }
+      #btn-vote,
       #btn-share,
       #btn-data,
       #btn-export {
@@ -167,7 +168,38 @@
         cursor: pointer;
         color: #40444f;
       }
-      #btn-export:hover, #btn-data:hover, #btn-share:hover { background: rgba(0, 0, 0, 0.06); }
+      #btn-export:hover, #btn-data:hover, #btn-share:hover, #btn-vote:hover { background: rgba(0, 0, 0, 0.06); }
+      #btn-vote.active { background: var(--accent); color: #fff; }
+
+      #votebar {
+        position: fixed;
+        left: 50%; top: 12px;
+        transform: translateX(-50%);
+        z-index: 12;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 8px 8px 16px;
+        font-size: 13px;
+      }
+      #votebar.active { display: flex; }
+      #votebar .remaining { font-weight: 600; color: var(--accent); }
+      #votebar .dots { display: flex; gap: 4px; }
+      #votebar .dots span {
+        width: 9px; height: 9px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      #votebar .dots span.spent { background: rgba(0, 0, 0, 0.12); }
+      #votebar button {
+        font: inherit; font-size: 12px; font-weight: 500;
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 7px;
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+      #votebar button:hover { background: #f3f3f1; }
       #btn-data.active { background: var(--accent); color: #fff; }
 
       #datapanel {
@@ -675,6 +707,7 @@
     </div>
 
     <div id="exportbar" class="panel">
+      <button id="btn-vote" title="Dot voting">Vote</button>
       <button id="btn-share" title="Share this board">Share</button>
       <button id="btn-data" title="Board data — \">Data</button>
       <button id="btn-export" title="Export the board">Export</button>
@@ -703,6 +736,13 @@
     <div id="minimap" class="panel"><canvas id="minimap-canvas" width="200" height="140"></canvas></div>
 
     <div id="comment-panel" class="panel"></div>
+
+    <div id="votebar" class="panel">
+      <span>Voting</span>
+      <span class="dots" id="vote-dots"></span>
+      <span class="remaining" id="vote-remaining"></span>
+      <button id="vote-end">End voting</button>
+    </div>
 
     <div id="toast"></div>
 

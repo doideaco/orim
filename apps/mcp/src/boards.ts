@@ -72,6 +72,8 @@ export function toExportBoard(store: BoardStore, title: string): ExportBoard {
     title,
     nodes: [...store.nodes.values()],
     connectors: [...store.connectors.values()],
+    comments: [...store.comments.values()],
+    votes: Object.fromEntries(store.voteTotals()),
   };
 }
 

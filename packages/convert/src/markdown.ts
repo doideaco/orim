@@ -30,15 +30,21 @@ export function boardToMarkdown(board: ExportBoard): string {
   const byId = new Map(board.nodes.map((n) => [n.id, n]));
   const lines: string[] = [`# ${board.title ?? "Untitled board"}`, ""];
 
+  const withVotes = (n: Node, block: string[]): string[] => {
+    const votes = board.votes?.[n.id];
+    if (!votes || !block[0]?.startsWith("- ")) return block;
+    return [`${block[0]} — ${votes} vote${votes === 1 ? "" : "s"}`, ...block.slice(1)];
+  };
+
   for (const { frame, children } of ordered.frames) {
     lines.push(`## ${frame.title}`, "");
-    for (const child of children) lines.push(...nodeBlock(child));
+    for (const child of children) lines.push(...withVotes(child, nodeBlock(child)));
     if (children.length) lines.push("");
   }
 
   if (ordered.loose.length) {
     if (ordered.frames.length) lines.push(`## Elsewhere on the board`, "");
-    for (const n of ordered.loose) lines.push(...nodeBlock(n));
+    for (const n of ordered.loose) lines.push(...withVotes(n, nodeBlock(n)));
     lines.push("");
   }
 

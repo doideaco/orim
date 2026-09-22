@@ -11,6 +11,8 @@ export interface ExportBoard {
   nodes: Node[];
   connectors: Connector[];
   comments?: BoardComment[];
+  /** Vote totals per node id, when the board has been dot-voted. */
+  votes?: Record<string, number>;
 }
 
 const ROW_BAND = 80; // world units: nodes whose tops are this close share a row

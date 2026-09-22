@@ -20,6 +20,7 @@ import { A11yMirror } from "./a11y-mirror";
 import { ORIM_CLIP_MARKER, setupFileDrop, setupPaste } from "./import-drop";
 import { CommentsUI } from "./comments-ui";
 import { api, authName, authToken, openAuthDialog } from "./auth";
+import { findEmptySpace } from "@orim/layout";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
@@ -313,6 +314,7 @@ store.subscribe(() => {
   dirty = true;
   dataPanel.scheduleRefresh();
   comments.refresh();
+  updateVoteBar();
   reconcileDerived();
 });
 
@@ -379,6 +381,15 @@ canvas.addEventListener("pointerdown", (e) => {
     const pin = comments.pinAt({ x: e.clientX, y: e.clientY });
     if (pin) {
       comments.open(pin.id);
+      dirty = true;
+      return;
+    }
+  }
+  // During a voting session, clicking votable content votes.
+  if (votingActive() && !readOnly && editor.tool === "select") {
+    const hit = editor.hitNode(toWorld(camera, { x: e.clientX, y: e.clientY }));
+    if (hit && VOTABLE.has(hit.type)) {
+      castVote(hit.id, e.shiftKey ? -1 : 1);
       dirty = true;
       return;
     }
@@ -829,6 +840,186 @@ async function openShareDialog(): Promise<void> {
   }
 }
 
+// --- voting ------------------------------------------------------------------
+
+interface VotingSession { active: boolean; budget: number; startedBy: string }
+const votingSession = (): VotingSession | undefined => store.getMeta<VotingSession>("voting");
+const votingActive = (): boolean => votingSession()?.active === true;
+const VOTABLE = new Set(["sticky", "shape", "text"]);
+
+function castVote(nodeId: string, delta: 1 | -1): void {
+  const session = votingSession();
+  if (!session?.active) return;
+  const mine = store.voteOf(nodeId, me.name);
+  if (delta > 0 && store.votesSpent(me.name) >= session.budget) {
+    toast(`All ${session.budget} votes spent — shift-click to take one back.`, true);
+    return;
+  }
+  if (delta < 0 && mine === 0) return;
+  store.setVote(nodeId, me.name, mine + delta);
+}
+
+function updateVoteBar(): void {
+  const session = votingSession();
+  const bar = $("votebar");
+  const active = session?.active === true && !readOnly;
+  bar.classList.toggle("active", active);
+  $("btn-vote").classList.toggle("active", session?.active === true);
+  if (!active || !session) return;
+  const spent = store.votesSpent(me.name);
+  const left = Math.max(0, session.budget - spent);
+  $("vote-remaining").textContent = `${left} left`;
+  const dots = $("vote-dots");
+  if (dots.childElementCount !== session.budget) {
+    dots.replaceChildren(
+      ...Array.from({ length: session.budget }, () => document.createElement("span")),
+    );
+  }
+  [...dots.children].forEach((dot, i) => {
+    dot.classList.toggle("spent", i >= left);
+  });
+}
+
+$("vote-end").addEventListener("click", () => {
+  const session = votingSession();
+  if (session) store.setMeta("voting", { ...session, active: false });
+});
+
+$("btn-vote").addEventListener("click", () => void openVoteDialog());
+
+async function openVoteDialog(): Promise<void> {
+  document.getElementById("share-backdrop")?.remove();
+  const backdrop = document.createElement("div");
+  backdrop.className = "dialog-backdrop";
+  const session = votingSession();
+  const totals = store.voteTotals();
+
+  if (session?.active) {
+    backdrop.innerHTML = `
+      <div class="dialog panel" role="dialog">
+        <h3>Voting is live</h3>
+        <p style="margin:0;font-size:13px;color:#6b7280">
+          Everyone has ${session.budget} votes. Click a sticky to vote,
+          shift-click to take a vote back.</p>
+        <div class="row"><button class="primary" id="v-end">End voting</button>
+        <button id="v-close">Close</button></div>
+      </div>`;
+    backdrop.querySelector("#v-end")!.addEventListener("click", () => {
+      store.setMeta("voting", { ...session, active: false });
+      backdrop.remove();
+    });
+  } else if (totals.size > 0) {
+    const ranked = [...totals.entries()]
+      .map(([id, votes]) => ({ node: store.getNode(id), votes }))
+      .filter((r) => r.node)
+      .sort((a, b) => b.votes - a.votes)
+      .slice(0, 8);
+    const list = ranked
+      .map((r) => {
+        const label = ("text" in r.node! && r.node!.text ? r.node!.text : r.node!.type)
+          .replace(/\n/g, " ").slice(0, 40);
+        return `<div class="share-row"><span>${label
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span><strong>${r.votes}</strong></div>`;
+      })
+      .join("");
+    backdrop.innerHTML = `
+      <div class="dialog panel" role="dialog">
+        <h3>Voting results</h3>
+        ${list}
+        <div class="row">
+          <button class="primary" id="v-rank">Rank into table</button>
+          <button id="v-again">New round</button>
+          <button id="v-clear">Clear</button>
+        </div>
+      </div>`;
+    backdrop.querySelector("#v-rank")!.addEventListener("click", () => {
+      rankVotesToTable();
+      backdrop.remove();
+    });
+    backdrop.querySelector("#v-again")!.addEventListener("click", () => {
+      store.clearVotes();
+      backdrop.remove();
+      void openVoteDialog();
+    });
+    backdrop.querySelector("#v-clear")!.addEventListener("click", () => {
+      store.clearVotes();
+      backdrop.remove();
+    });
+  } else {
+    backdrop.innerHTML = `
+      <div class="dialog panel" role="dialog">
+        <h3>Start voting</h3>
+        <label style="font-size:13px;color:#6b7280">Votes per person
+          <input id="v-budget" type="number" min="1" max="10" value="3" style="width:100%" />
+        </label>
+        <div class="row"><button class="primary" id="v-start">Start</button>
+        <button id="v-close">Close</button></div>
+      </div>`;
+    backdrop.querySelector("#v-start")!.addEventListener("click", () => {
+      const budget = Math.max(1, Math.min(10,
+        Number((backdrop.querySelector("#v-budget") as HTMLInputElement).value) || 3));
+      store.setMeta("voting", { active: true, budget, startedBy: me.name });
+      backdrop.remove();
+      toast(`Voting started — ${budget} votes each. Click a sticky to vote.`);
+    });
+  }
+  backdrop.querySelector("#v-close")?.addEventListener("click", () => backdrop.remove());
+  backdrop.addEventListener("pointerdown", (e) => {
+    if (e.target === backdrop) backdrop.remove();
+  });
+  for (const input of backdrop.querySelectorAll("input")) {
+    input.addEventListener("keydown", (e) => e.stopPropagation());
+  }
+  document.body.appendChild(backdrop);
+}
+
+/** Votes → a bound, ranked table beside the voted content. */
+function rankVotesToTable(): void {
+  const ranked = [...store.voteTotals().entries()]
+    .map(([id, votes]) => ({ node: store.getNode(id), votes }))
+    .filter((r): r is { node: NonNullable<typeof r.node>; votes: number } => !!r.node)
+    .sort((a, b) => b.votes - a.votes);
+  if (!ranked.length) return;
+  const columns = [
+    { id: "c0", name: "Item", w: 260 },
+    { id: "c1", name: "Votes", w: 100 },
+  ];
+  const rows = ranked.map((r, i) => ({
+    id: `r${i}`,
+    cells: {
+      c0: "text" in r.node && r.node.text ? r.node.text : r.node.type,
+      c1: String(r.votes),
+    },
+  }));
+  const right = Math.max(...ranked.map((r) => r.node.x + r.node.w));
+  const top = Math.min(...ranked.map((r) => r.node.y));
+  const pos = findEmptySpace([...store.nodes.values()], 360, (rows.length + 1) * 34, {
+    x: right + 120, y: top,
+  });
+  const tableId = newId();
+  store.transact(() => {
+    store.upsertNode({
+      id: tableId, type: "table", parent: null,
+      x: pos.x, y: pos.y, w: 360, h: (rows.length + 1) * 34,
+      rotation: 0, index: store.topIndex(), locked: false, data: {},
+      title: "Vote results", columns, rows,
+    });
+    ranked.forEach((r, i) => {
+      store.updateNode(r.node.id, {
+        data: { ...r.node.data, $source: { table: tableId, row: `r${i}`, column: "c0" } },
+      });
+    });
+  });
+  editor.selectOnly(tableId);
+  const table = store.getNode(tableId);
+  if (table) {
+    camera.x = table.x + table.w / 2 - window.innerWidth / 2 / camera.zoom;
+    camera.y = table.y + table.h / 2 - window.innerHeight / 2 / camera.zoom;
+  }
+  toast(`Ranked ${rows.length} items into a table, bound to their stickies.`);
+  dirty = true;
+}
+
 // --- export ------------------------------------------------------------------
 
 const exportBtn = $("btn-export");
@@ -841,6 +1032,7 @@ function exportBoard(): ExportBoard {
     nodes: [...store.nodes.values()],
     connectors: [...store.connectors.values()],
     comments: [...store.comments.values()],
+    votes: Object.fromEntries(store.voteTotals()),
   };
 }
 
@@ -937,6 +1129,17 @@ minimapCanvas.addEventListener("pointerdown", (e) => {
   dirty = true;
 });
 
+let voteTotals: Map<string, number> | null = null;
+let voteTotalsRev = -1;
+function voteTotalsCached(): Map<string, number> | null {
+  if (voteTotalsRev !== store.revision) {
+    const totals = store.voteTotals();
+    voteTotals = totals.size ? totals : null;
+    voteTotalsRev = store.revision;
+  }
+  return voteTotals;
+}
+
 // --- render loop -------------------------------------------------------------
 
 let frames = 0;
@@ -964,6 +1167,7 @@ function frame(): void {
           : null,
       comments: comments.visible(),
       activeCommentId: comments.activeId,
+      votes: voteTotalsCached(),
       marquee: editor.marquee,
       draftRect: editor.draftRect,
       draftConnector: editor.draftConnector,
@@ -1012,6 +1216,7 @@ $("statusbar").addEventListener("click", () => {
 
 syncToolbar();
 setupTooltips();
+updateVoteBar();
 requestAnimationFrame(frame);
 
 // Debug handle for verification (not part of the product surface).

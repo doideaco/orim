@@ -44,6 +44,8 @@ export interface Scene {
   portsFor: NodeId | null;
   /** Unresolved comments to draw as pins. */
   comments: BoardComment[];
+  /** Vote totals per node; drawn as badges when present. */
+  votes: ReadonlyMap<NodeId, number> | null;
   /** Comment whose thread is open (its pin is highlighted). */
   activeCommentId: string | null;
   marquee: Rect | null;
@@ -195,6 +197,27 @@ export class Renderer {
         ctx.strokeStyle = SELECTION_COLOR;
         ctx.lineWidth = 2 / z;
         ctx.strokeRect(n.x - 2 / z, n.y - 2 / z, n.w + 4 / z, n.h + 4 / z);
+      }
+
+      const votes = scene.votes?.get(n.id);
+      if (votes) {
+        const label = String(votes);
+        ctx.font = `600 12px ${FONT_STACK}`;
+        const tw = ctx.measureText(label).width;
+        const bw = Math.max(22, tw + 12);
+        const bx = n.x + n.w - bw / 2 - 4;
+        const by = n.y - 6;
+        ctx.fillStyle = SELECTION_COLOR;
+        ctx.beginPath();
+        ctx.roundRect(bx - bw / 2, by - 11, bw, 22, 11);
+        ctx.fill();
+        ctx.lineWidth = 2 / Math.max(z, 0.5);
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.stroke();
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, bx - tw / 2, by + 1);
+        ctx.textBaseline = "top";
       }
     }
 
