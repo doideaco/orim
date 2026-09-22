@@ -61,6 +61,13 @@ decision.
 - Generated objects carry their source rows in `data` — the diagram is still
   a database
 
+**The format is the spec**
+- The board format is openly documented at [`docs/`](docs/index.html) — served
+  as a static site (GitHub Pages ready), with a machine-readable
+  [JSON Schema](docs/orim.schema.json) **generated from the zod source of
+  truth** (`pnpm --dir packages/schema spec`), so the spec can't drift from
+  the implementation
+
 **Export — your data is never trapped**
 - Markdown outline (reading order, real Markdown tables, connection lists),
   Mermaid, SVG, PNG, and the open JSON format — one click each

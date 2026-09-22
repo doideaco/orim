@@ -1,0 +1,671 @@
+{
+  "$ref": "#/definitions/OrimBoard",
+  "definitions": {
+    "Node": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Node/anyOf/0/properties/id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "w": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "h": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "rotation": {
+              "type": "number",
+              "default": 0
+            },
+            "index": {
+              "type": "string",
+              "default": "a0"
+            },
+            "locked": {
+              "type": "boolean",
+              "default": false
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": {},
+              "default": {}
+            },
+            "type": {
+              "type": "string",
+              "const": "sticky"
+            },
+            "text": {
+              "type": "string",
+              "default": ""
+            },
+            "color": {
+              "type": "string",
+              "enum": [
+                "gray",
+                "blue",
+                "teal",
+                "green",
+                "yellow",
+                "orange",
+                "red",
+                "pink",
+                "violet"
+              ],
+              "default": "yellow"
+            },
+            "author": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/id"
+            },
+            "parent": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/parent"
+            },
+            "x": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/x"
+            },
+            "y": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/y"
+            },
+            "w": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/w"
+            },
+            "h": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/h"
+            },
+            "rotation": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/rotation"
+            },
+            "index": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/index"
+            },
+            "locked": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/locked"
+            },
+            "data": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/data"
+            },
+            "type": {
+              "type": "string",
+              "const": "shape"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "rect",
+                "ellipse",
+                "diamond",
+                "pill"
+              ],
+              "default": "rect"
+            },
+            "text": {
+              "type": "string",
+              "default": ""
+            },
+            "color": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/color",
+              "default": "blue"
+            },
+            "fillStyle": {
+              "type": "string",
+              "enum": [
+                "solid",
+                "outline",
+                "none"
+              ],
+              "default": "solid"
+            }
+          },
+          "required": [
+            "id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/id"
+            },
+            "parent": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/parent"
+            },
+            "x": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/x"
+            },
+            "y": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/y"
+            },
+            "w": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/w"
+            },
+            "h": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/h"
+            },
+            "rotation": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/rotation"
+            },
+            "index": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/index"
+            },
+            "locked": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/locked"
+            },
+            "data": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/data"
+            },
+            "type": {
+              "type": "string",
+              "const": "frame"
+            },
+            "title": {
+              "type": "string",
+              "default": "Frame"
+            }
+          },
+          "required": [
+            "id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/id"
+            },
+            "parent": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/parent"
+            },
+            "x": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/x"
+            },
+            "y": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/y"
+            },
+            "w": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/w"
+            },
+            "h": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/h"
+            },
+            "rotation": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/rotation"
+            },
+            "index": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/index"
+            },
+            "locked": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/locked"
+            },
+            "data": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/data"
+            },
+            "type": {
+              "type": "string",
+              "const": "text"
+            },
+            "text": {
+              "type": "string",
+              "default": ""
+            },
+            "fontSize": {
+              "type": "number",
+              "default": 16
+            }
+          },
+          "required": [
+            "id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/id"
+            },
+            "parent": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/parent"
+            },
+            "x": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/x"
+            },
+            "y": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/y"
+            },
+            "w": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/w"
+            },
+            "h": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/h"
+            },
+            "rotation": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/rotation"
+            },
+            "index": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/index"
+            },
+            "locked": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/locked"
+            },
+            "data": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/data"
+            },
+            "type": {
+              "type": "string",
+              "const": "ink"
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "color": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/color",
+              "default": "gray"
+            },
+            "size": {
+              "type": "number",
+              "default": 4
+            }
+          },
+          "required": [
+            "id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "type",
+            "points"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/id"
+            },
+            "parent": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/parent"
+            },
+            "x": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/x"
+            },
+            "y": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/y"
+            },
+            "w": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/w"
+            },
+            "h": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/h"
+            },
+            "rotation": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/rotation"
+            },
+            "index": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/index"
+            },
+            "locked": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/locked"
+            },
+            "data": {
+              "$ref": "#/definitions/Node/anyOf/0/properties/data"
+            },
+            "type": {
+              "type": "string",
+              "const": "table"
+            },
+            "title": {
+              "type": "string",
+              "default": "Table"
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "default": ""
+                  },
+                  "w": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "default": 160
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "cells": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "default": {}
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "type",
+            "columns",
+            "rows"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Connector": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/Node/anyOf/0/properties/id"
+        },
+        "type": {
+          "type": "string",
+          "const": "connector"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "$ref": "#/definitions/Node/anyOf/0/properties/id"
+                },
+                "anchor": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "n",
+                    "s",
+                    "e",
+                    "w"
+                  ],
+                  "default": "auto"
+                },
+                "row": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "point"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "to": {
+          "$ref": "#/definitions/Connector/properties/from"
+        },
+        "label": {
+          "type": "string",
+          "default": ""
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "line",
+            "arrow",
+            "double"
+          ],
+          "default": "arrow"
+        },
+        "index": {
+          "type": "string",
+          "default": "a0"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": {},
+          "default": {}
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "Comment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "$ref": "#/definitions/Node/anyOf/0/properties/id"
+                }
+              },
+              "required": [
+                "node"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "$ref": "#/definitions/Connector/properties/from/anyOf/1/properties/point"
+                }
+              },
+              "required": [
+                "point"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "author": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "at": {
+          "type": "number"
+        },
+        "resolved": {
+          "type": "boolean",
+          "default": false
+        },
+        "replies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "author": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "at": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "author",
+              "body",
+              "at"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "id",
+        "anchor",
+        "author",
+        "body",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "OrimBoard": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "number",
+          "const": 0
+        },
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "default": "Untitled board"
+        },
+        "nodes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Node"
+          },
+          "propertyNames": {
+            "minLength": 1
+          }
+        },
+        "connectors": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Connector"
+          },
+          "propertyNames": {
+            "minLength": 1
+          }
+        },
+        "comments": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Comment"
+          },
+          "default": {}
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "nodes",
+        "connectors"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "Orim board format, schemaVersion 0. Generated from @orim/schema — do not edit by hand."
+}

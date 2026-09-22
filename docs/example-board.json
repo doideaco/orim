@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 0,
+  "id": "orim-example",
+  "title": "Example board",
+  "nodes": {
+    "frame-1": {
+      "id": "frame-1", "type": "frame", "parent": null,
+      "x": 0, "y": 0, "w": 460, "h": 320,
+      "rotation": 0, "index": "a0", "locked": false, "data": {},
+      "title": "Ideas"
+    },
+    "sticky-1": {
+      "id": "sticky-1", "type": "sticky", "parent": "frame-1",
+      "x": 24, "y": 56, "w": 180, "h": 120,
+      "rotation": 0, "index": "a0V", "locked": false,
+      "data": { "votes": 3, "owner": "sam" },
+      "text": "Open file format", "color": "green", "author": "sam"
+    },
+    "sticky-2": {
+      "id": "sticky-2", "type": "sticky", "parent": null,
+      "x": 560, "y": 400, "w": 180, "h": 120,
+      "rotation": 0, "index": "a0VV", "locked": false,
+      "data": { "$source": { "table": "table-1", "row": "r0", "column": "c0" } },
+      "text": "Ship the spec site", "color": "yellow"
+    },
+    "shape-1": {
+      "id": "shape-1", "type": "shape", "parent": null,
+      "x": 560, "y": 40, "w": 176, "h": 64,
+      "rotation": 0, "index": "a0VVV", "locked": false, "data": {},
+      "kind": "diamond", "text": "Ready?", "color": "orange", "fillStyle": "solid"
+    },
+    "table-1": {
+      "id": "table-1", "type": "table", "parent": null,
+      "x": 0, "y": 420, "w": 480, "h": 102,
+      "rotation": 0, "index": "a0VVVV", "locked": false, "data": {},
+      "title": "Tasks",
+      "columns": [
+        { "id": "c0", "name": "Task", "w": 240 },
+        { "id": "c1", "name": "Status", "w": 240 }
+      ],
+      "rows": [
+        { "id": "r0", "cells": { "c0": "Ship the spec site", "c1": "In progress" } },
+        { "id": "r1", "cells": { "c0": "Publish JSON Schema", "c1": "Done" } }
+      ]
+    }
+  },
+  "connectors": {
+    "conn-1": {
+      "id": "conn-1", "type": "connector",
+      "from": { "node": "sticky-1", "anchor": "auto" },
+      "to": { "node": "shape-1", "anchor": "auto" },
+      "label": "next", "style": "arrow", "index": "a0", "data": {}
+    },
+    "conn-2": {
+      "id": "conn-2", "type": "connector",
+      "from": { "node": "shape-1", "anchor": "s" },
+      "to": { "node": "table-1", "anchor": "auto", "row": "r0" },
+      "label": "", "style": "arrow", "index": "a0V", "data": {}
+    }
+  },
+  "comments": {
+    "comment-1": {
+      "id": "comment-1",
+      "anchor": { "node": "sticky-1" },
+      "author": "alex", "body": "Love this — spec first.",
+      "at": 1789000000000, "resolved": false,
+      "replies": [
+        { "author": "sam", "body": "Agreed, shipping it.", "at": 1789000600000 }
+      ]
+    }
+  }
+}

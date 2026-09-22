@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orim file format</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='-11.35 12.85 96 96' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 61.0561C0 40.7041 15.744 25.6001 36.48 25.6001C58.112 25.6001 73.344 40.4481 73.344 60.8001C73.344 81.0241 57.728 96.1281 36.48 96.1281C15.104 96.1281 0 81.2801 0 61.0561ZM21.376 61.0561C21.376 70.7841 27.776 77.3121 36.48 77.3121C45.312 77.3121 51.968 70.4001 51.968 60.8001C51.968 50.9441 45.184 44.4161 36.48 44.4161C27.648 44.4161 21.376 51.2001 21.376 61.0561Z' fill='%231F2430'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --faint: #9ca3af;
+    --accent: #4f7cff;
+    --border: rgba(0, 0, 0, 0.08);
+    --code-bg: #f6f6f4;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+    color: var(--ink);
+    background: #fff;
+    line-height: 1.62;
+    font-size: 15px;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 26px 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  header img { height: 22px; transform: translateY(2px); }
+  header .sub { font-size: 15px; color: var(--muted); }
+  header .badge {
+    font-size: 11px; font-weight: 600;
+    color: var(--accent);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 1px 9px;
+  }
+  header a.gh { margin-left: auto; font-size: 13px; color: var(--muted); text-decoration: none; }
+  header a.gh:hover { color: var(--ink); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 230px minmax(0, 760px);
+    gap: 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 32px 120px;
+  }
+  nav.toc {
+    position: sticky; top: 32px;
+    align-self: start;
+    font-size: 13px;
+  }
+  nav.toc a {
+    display: block;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 0 4px 12px;
+    border-left: 2px solid transparent;
+  }
+  nav.toc a:hover { color: var(--ink); }
+  nav.toc a.h2 { font-weight: 500; }
+  nav.toc a.h3 { padding-left: 26px; font-size: 12.5px; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    nav.toc { display: none; }
+  }
+
+  h1 { font-size: 30px; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { font-size: 16.5px; color: var(--muted); margin: 0 0 36px; }
+  h2 {
+    font-size: 20px; letter-spacing: -0.01em;
+    margin: 52px 0 12px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+  h3 { font-size: 15.5px; margin: 30px 0 8px; }
+  p { margin: 0 0 14px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.86em;
+    background: var(--code-bg);
+    border-radius: 5px;
+    padding: 1.5px 5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+    max-height: 460px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 12px 0 20px;
+  }
+  th {
+    text-align: left;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--faint);
+    padding: 6px 12px 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 7px 12px 7px 0;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  td:first-child code { background: none; padding: 0; font-weight: 600; }
+  td.type { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+  td.desc { color: var(--muted); }
+  .req { color: var(--accent); font-size: 11px; font-weight: 600; margin-left: 5px; }
+  a { color: var(--accent); }
+  .note {
+    background: #f4f7ff;
+    border: 1px solid rgba(79, 124, 255, 0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .files { display: flex; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+  .files a {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    text-decoration: none;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+  .files a:hover { border-color: var(--accent); }
+  .files a span { display: block; font-size: 12px; color: var(--faint); }
+</style>
+</head>
+<body>
+<header>
+  <img src="orim.svg" alt="Orim" />
+  <span class="sub">File format</span>
+  <span class="badge" id="version-badge">schemaVersion 0</span>
+  <a class="gh" href="https://github.com/doideaco/orim">github.com/doideaco/orim</a>
+</header>
+
+<div class="layout">
+  <nav class="toc" id="toc"></nav>
+  <main id="content">
+    <h1>The Orim board format</h1>
+    <p class="lede">
+      An Orim board is a typed, structured graph that happens to have a spatial
+      projection. This page specifies that graph: plain JSON, fully documented,
+      designed to be read and written by things that aren't Orim.
+    </p>
+
+    <div class="note">
+      <strong>Stability promise.</strong> Everything here is plain JSON and
+      round-trippable. Changes within a <code>schemaVersion</code> are additive
+      only; breaking changes bump the version and ship with documented
+      migrations. Your data is never trapped: every board exports to this
+      format in one click, and the format will always be openly documented.
+    </div>
+
+    <h2 id="document">The document</h2>
+    <p>
+      A board document has a <code>schemaVersion</code>, an <code>id</code>, a
+      <code>title</code>, and three keyed collections: <code>nodes</code>,
+      <code>connectors</code>, and <code>comments</code> — each a map from id
+      to object. Ids are opaque strings, unique within their collection.
+    </p>
+    <div id="doc-table"></div>
+
+    <h2 id="common">Common node fields</h2>
+    <p>
+      Every node shares a spatial and structural base. Coordinates are world
+      units (unbounded, y grows downward); a sticky note is 180×120 by
+      convention. <code>index</code> is a lexicographic z-order key — sort
+      ascending, draw first-to-last. <code>parent</code> points at a frame and
+      drives containment and reading order. <code>data</code> is a free-form
+      bag of typed fields; this is what makes a board a database — votes,
+      owners, SLAs, anything.
+    </p>
+    <div id="common-table"></div>
+
+    <h2 id="nodes">Node types</h2>
+    <div id="node-tables"></div>
+
+    <h2 id="connectors">Connectors</h2>
+    <p>
+      Connectors are first-class edges, stored separately from nodes. An
+      endpoint is either bound to a node (<code>{ node, anchor }</code> — the
+      connector follows it) or a free point (<code>{ point: {x, y} }</code>).
+      <code>anchor</code> is a side (<code>n s e w</code>) or
+      <code>auto</code>, which picks the side facing the other end. Binding to
+      a <em>table</em> may name a <code>row</code>; the connector then anchors
+      to that row's edge and follows it — a link to a record, not a rectangle.
+      Routing (elbows, obstacle avoidance) is presentation, not data: only
+      endpoints are stored.
+    </p>
+    <div id="connector-table"></div>
+
+    <h2 id="comments">Comments</h2>
+    <p>
+      Threaded comments anchor to a node (following it) or a free point.
+      Resolved threads keep their history but leave the canvas and exports.
+    </p>
+    <div id="comment-table"></div>
+
+    <h2 id="semantics">Semantics</h2>
+    <h3 id="reading-order">Reading order</h3>
+    <p>
+      One ordering drives the Markdown export, the accessibility tree, and
+      agent reads: frames first (sorted spatially — rows top-to-bottom,
+      left-to-right within a row band), each with its children spatially
+      sorted, then loose nodes, then connectors. What you export is what a
+      screen reader hears is what an agent reads.
+    </p>
+    <h3 id="bindings">Cell bindings</h3>
+    <p>
+      A node whose text derives from a table cell stores
+      <code>data.$source = { table, row, column }</code>. The cell is the
+      source of truth: editing the node writes through to the cell, and every
+      bound node follows cell changes. Position stays entirely the node's own
+      — the binding is data, not geometry.
+    </p>
+    <h3 id="collaboration">Collaboration</h3>
+    <p>
+      Orim stores boards as Yjs documents (one CRDT map entry per object, one
+      field per key, giving field-level last-writer-wins). This JSON format is
+      the canonical snapshot of that document: exports serialize it, imports
+      and agents write it, and any CRDT implementation that produces the same
+      shape interoperates.
+    </p>
+
+    <h2 id="interop">Interop</h2>
+    <p>
+      Every board exports as this JSON, a Markdown outline (tables become real
+      Markdown tables, connectors a Connections list), Mermaid, SVG, and PNG.
+      Markdown, Mermaid, CSV/TSV and Excel import back in. An MCP server
+      exposes boards to AI agents: <code>read_board</code>,
+      <code>create_objects</code>, <code>update_objects</code>,
+      <code>delete_objects</code>, <code>apply_layout</code>,
+      <code>find_empty_space</code>, <code>synthesize_table</code>.
+    </p>
+
+    <h2 id="machine">Machine-readable</h2>
+    <p>
+      The JSON Schema below is generated from Orim's zod definitions on every
+      change — it cannot drift from the implementation. The example validates
+      against it in CI.
+    </p>
+    <div class="files">
+      <a href="orim.schema.json">orim.schema.json <span>JSON Schema</span></a>
+      <a href="example-board.json">example-board.json <span>a small valid board</span></a>
+    </div>
+    <h3 id="example">Example</h3>
+    <pre><code id="example-json">loading…</code></pre>
+  </main>
+</div>
+
+<script>
+const FIELD_DOCS = {
+  schemaVersion: "Format version. Breaking changes bump it.",
+  id: "Opaque unique id.",
+  title: "Human-readable name.",
+  nodes: "Map of node id → node.",
+  connectors: "Map of connector id → connector.",
+  comments: "Map of comment id → comment.",
+  parent: "Containing frame's id, or null at board root.",
+  x: "World-space left edge.", y: "World-space top edge.",
+  w: "Width in world units.", h: "Height in world units.",
+  rotation: "Degrees. Reserved; renderers may ignore.",
+  index: "Lexicographic z-order key; sort ascending, draw first-to-last.",
+  locked: "Locked objects ignore pointer edits.",
+  data: "Free-form bag of typed fields. data.$source marks a cell binding.",
+  text: "Plain text; newlines allowed.",
+  color: "Named palette color; themes map names to values.",
+  author: "Display name of the creator, if known.",
+  kind: "Shape geometry.",
+  fillStyle: "solid fill, outline only, or no fill.",
+  fontSize: "Text size in world units.",
+  points: "Flattened [x, y, pressure, …], relative to (x, y).",
+  size: "Stroke size in world units.",
+  columns: "Ordered columns; w is a relative width weight.",
+  rows: "Ordered rows; cells maps column id → text.",
+  from: "Start endpoint.", to: "End endpoint.",
+  label: "Optional label shown on the connector.",
+  style: "line (no head), arrow, or double (heads both ends).",
+  anchor: "Side to attach on, or auto to face the other end.",
+  row: "Optional table row id for row-level endpoints.",
+  point: "Free world-space point.",
+  node: "Bound node id.",
+  body: "Comment text.",
+  at: "Unix milliseconds.",
+  resolved: "Resolved threads leave the canvas and exports.",
+  replies: "Ordered replies: { author, body, at }.",
+  anchor_comment: "A node to follow, or a fixed point.",
+};
+
+const resolveRef = (root, ref) =>
+  ref.replace(/^#\//, "").split("/").reduce((o, k) => o?.[k], root);
+
+function typeString(root, prop, depth = 0) {
+  if (!prop || depth > 4) return "…";
+  if (prop.$ref) {
+    const parts = prop.$ref.split("/");
+    if (parts.length === 3 && parts[1] === "definitions") return parts[2];
+    return typeString(root, resolveRef(root, prop.$ref), depth + 1);
+  }
+  if (prop.const !== undefined) return JSON.stringify(prop.const);
+  if (prop.enum) return prop.enum.map((v) => JSON.stringify(v)).join(" | ");
+  if (prop.anyOf) {
+    return [...new Set(prop.anyOf.map((p) => typeString(root, p, depth + 1)))].join(" | ");
+  }
+  if (prop.type === "array") return `${typeString(root, prop.items, depth + 1)}[]`;
+  if (prop.type === "object") {
+    if (prop.additionalProperties && !prop.properties) {
+      const ap = prop.additionalProperties;
+      if (ap.$ref) return `record<${ap.$ref.split("/").pop()}>`;
+      return `record<${typeString(root, ap, depth + 1)}>`;
+    }
+    if (prop.properties) {
+      const keys = Object.keys(prop.properties);
+      if (keys.length <= 4 && depth > 0) {
+        return `{ ${keys.map((k) => `${k}: ${typeString(root, prop.properties[k], depth + 1)}`).join(", ")} }`;
+      }
+      return "object";
+    }
+    return "object";
+  }
+  return prop.type ?? "…";
+}
+
+function fieldTable(root, variant, { skip = [], only = null } = {}) {
+  const props = variant.properties ?? {};
+  const required = new Set(variant.required ?? []);
+  const rows = Object.entries(props)
+    .filter(([k]) => !skip.includes(k) && (!only || only.includes(k)))
+    .map(([k, p]) => {
+      const def = p.default !== undefined ? ` <span style="color:var(--faint)">= ${JSON.stringify(p.default)}</span>` : "";
+      return `<tr>
+        <td><code>${k}</code>${required.has(k) && p.default === undefined ? '<span class="req">required</span>' : ""}</td>
+        <td class="type">${typeString(root, p)}${def}</td>
+        <td class="desc">${FIELD_DOCS[k] ?? ""}</td>
+      </tr>`;
+    })
+    .join("");
+  return `<table><thead><tr><th>Field</th><th>Type</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function render() {
+  const [schema, example] = await Promise.all([
+    fetch("orim.schema.json").then((r) => r.json()),
+    fetch("example-board.json").then((r) => r.json()),
+  ]);
+  document.getElementById("example-json").textContent = JSON.stringify(example, null, 2);
+  document.getElementById("version-badge").textContent = `schemaVersion ${example.schemaVersion}`;
+
+  const defs = schema.definitions;
+  document.getElementById("doc-table").innerHTML = fieldTable(schema, defs.OrimBoard);
+
+  const variants = defs.Node.anyOf;
+  const typeOf = (v) => {
+    const t = v.properties?.type;
+    return t?.const ?? t?.enum?.[0] ?? "?";
+  };
+  // Common fields = present in every variant.
+  const common = Object.keys(variants[0].properties).filter((k) =>
+    variants.every((v) => k in v.properties),
+  );
+  document.getElementById("common-table").innerHTML = fieldTable(schema, variants[0], {
+    only: common.filter((k) => k !== "type"),
+  });
+
+  const DOC_BLURBS = {
+    sticky: "The workhorse. Square-ish, colored, carries text and data.",
+    shape: "Rect, ellipse, diamond or pill, with centered text.",
+    frame: "A container. Children reference it via parent; it names sections in exports and the accessibility tree.",
+    text: "Free-standing text.",
+    ink: "A freehand stroke.",
+    table: "A grid of typed records on the canvas. Rows are addressable: bindings and connectors can target them.",
+  };
+  document.getElementById("node-tables").innerHTML = variants
+    .map((v) => {
+      const t = typeOf(v);
+      return `<h3 id="node-${t}"><code>${t}</code></h3>
+        <p>${DOC_BLURBS[t] ?? ""}</p>
+        ${fieldTable(schema, v, { skip: [...common, "type"] })}`;
+    })
+    .join("");
+
+  document.getElementById("connector-table").innerHTML = fieldTable(schema, defs.Connector, {
+    skip: ["type"],
+  });
+  document.getElementById("comment-table").innerHTML = fieldTable(schema, defs.Comment);
+
+  // TOC from headings.
+  const toc = document.getElementById("toc");
+  for (const h of document.querySelectorAll("main h2[id], main h3[id]")) {
+    const a = document.createElement("a");
+    a.href = `#${h.id}`;
+    a.textContent = h.textContent;
+    a.className = h.tagName.toLowerCase();
+    toc.appendChild(a);
+  }
+}
+render();
+</script>
+</body>
+</html>
