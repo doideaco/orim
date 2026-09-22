@@ -37,7 +37,7 @@ export function boardToMarkdown(board: ExportBoard): string {
     const votes = board.votes?.[n.id];
     if (votes) parts.push(`${votes} vote${votes === 1 ? "" : "s"}`);
     for (const [key, value] of numericFields(n)) {
-      parts.push(`${key}: ${formatFieldValue(value)}`);
+      parts.push(`${key}: ${formatFieldValue(value, key)}`);
     }
     if (!parts.length) return block;
     return [`${block[0]} — ${parts.join(" · ")}`, ...block.slice(1)];

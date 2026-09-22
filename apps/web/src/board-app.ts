@@ -4,11 +4,12 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { BoardStore } from "@orim/store";
 import { cellSource, type PaletteColor } from "@orim/schema";
 import {
-  Editor, cameraToFit, fieldChips, tableCellRect, toScreen, toWorld, zoomAt,
-  type Camera, type ToolName,
+  Editor, cameraToFit, fieldChips, setChipMeasurer, setFieldCurrency,
+  tableCellRect, toScreen, toWorld, zoomAt, type Camera, type ToolName,
 } from "@orim/editor";
 import {
-  Renderer, PALETTE, PALETTE_KEYS, CURSOR_COLORS, type PresenceState,
+  Renderer, CHIP_FONT, PALETTE, PALETTE_KEYS, CURSOR_COLORS,
+  type PresenceState,
 } from "@orim/renderer";
 import {
   boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG, TEMPLATES,
@@ -43,6 +44,28 @@ let dirty = true;
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
+
+// Chip layout uses real text measurement so hit rects match drawn pixels.
+{
+  const mctx = document.createElement("canvas").getContext("2d")!;
+  setChipMeasurer((text, bold) => {
+    mctx.font = `${bold ? "600 " : ""}${CHIP_FONT}px -apple-system, system-ui, sans-serif`;
+    return mctx.measureText(text).width;
+  });
+}
+
+/** Currency for cost-shaped fields: a synced board setting, defaulting
+ *  from the browser locale. */
+function localeCurrency(): string {
+  const lang = navigator.language ?? "";
+  if (/-(GB|UK)/i.test(lang)) return "£";
+  if (/^(de|fr|es|it|nl|pt|fi|et|el|sk|sl|lv|lt|ie)/i.test(lang)) return "€";
+  return "$";
+}
+function applyCurrency(): void {
+  setFieldCurrency(store.getMeta<string>("currency") ?? localeCurrency());
+}
+applyCurrency();
 const overlay = new TextEditorOverlay(document.getElementById("overlay-root")!);
 const minimapCanvas = document.getElementById("minimap-canvas") as HTMLCanvasElement;
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -361,6 +384,7 @@ store.subscribe(() => {
   updateVoteBar();
   updateTimerBar();
   checkRevealAsk();
+  applyCurrency();
   reconcileDerived();
 });
 

@@ -2,9 +2,12 @@ import type { Connector, Node, NodeId } from "@orim/schema";
 import {
   elbowRoute, fieldChips, formatFieldValue, frameAggregates, nodeRect,
   routeConnector, tableColumnEdges, tableColumnTotals, visibleWorldRect,
-  toScreen, TABLE_ROW_H,
+  toScreen, CHIP_GAP_KV, CHIP_PAD, TABLE_ROW_H,
   type Camera, type Point, type Rect,
 } from "@orim/editor";
+
+/** Chip font size; the chip measurer installed by the app must match. */
+export const CHIP_FONT = 11;
 import type { BoardComment, TableNode } from "@orim/schema";
 
 /** World position of a comment's pin. */
@@ -138,14 +141,14 @@ export class Renderer {
         ctx.fillText(n.title, n.x + 1, n.y - 8 / z);
         // Zero-config aggregates over the children's numeric fields.
         for (const agg of frameAggregates(n, childrenByParent.get(n.id) ?? [])) {
-          ctx.fillStyle = "#ECECEA";
+          ctx.fillStyle = "#EBEBE8";
           ctx.beginPath();
           ctx.roundRect(agg.rect.x, agg.rect.y, agg.rect.w, agg.rect.h, agg.rect.h / 2);
           ctx.fill();
           ctx.fillStyle = "#4B5563";
-          ctx.font = `600 11px ${FONT_STACK}`;
+          ctx.font = `600 ${CHIP_FONT}px ${FONT_STACK}`;
           ctx.textBaseline = "middle";
-          ctx.fillText(agg.label, agg.rect.x + 7, agg.rect.y + agg.rect.h / 2 + 1);
+          ctx.fillText(agg.label, agg.rect.x + CHIP_PAD, agg.rect.y + agg.rect.h / 2 + 0.5);
           ctx.textBaseline = "alphabetic";
         }
       }
@@ -622,7 +625,7 @@ export class Renderer {
       ctx.fillStyle = "#6B7280";
       for (const t of totals) {
         ctx.fillText(
-          `Σ ${formatFieldValue(t.sum)}`,
+          `Σ ${formatFieldValue(t.sum, n.columns[t.colIndex]?.name)}`,
           n.x + edges[t.colIndex]! + 10,
           n.y + n.h + 15,
         );
@@ -631,20 +634,28 @@ export class Renderer {
     ctx.textBaseline = "top";
   }
 
-  /** Smart-field chips along a node's bottom edge. */
+  /** Smart-field chips along a node's bottom edge: muted key, bold value. */
   private drawFieldChips(n: Parameters<typeof fieldChips>[0], textColor: string): void {
     const { ctx } = this;
     const chips = fieldChips(n);
     if (!chips.length) return;
+    ctx.textBaseline = "middle";
     for (const chip of chips) {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.05)";
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.roundRect(chip.rect.x, chip.rect.y, chip.rect.w, chip.rect.h, chip.rect.h / 2);
       ctx.fill();
+      ctx.stroke();
+      const cy = chip.rect.y + chip.rect.h / 2 + 0.5;
       ctx.fillStyle = textColor;
-      ctx.font = `600 10.5px ${FONT_STACK}`;
-      ctx.textBaseline = "middle";
-      ctx.fillText(chip.label, chip.rect.x + 6, chip.rect.y + chip.rect.h / 2 + 1);
+      ctx.globalAlpha = 0.62;
+      ctx.font = `${CHIP_FONT}px ${FONT_STACK}`;
+      ctx.fillText(chip.key, chip.rect.x + CHIP_PAD, cy);
+      ctx.globalAlpha = 1;
+      ctx.font = `600 ${CHIP_FONT}px ${FONT_STACK}`;
+      ctx.fillText(chip.valueLabel, chip.rect.x + CHIP_PAD + chip.keyW + CHIP_GAP_KV, cy);
     }
     ctx.textBaseline = "top";
   }

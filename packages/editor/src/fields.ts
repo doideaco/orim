@@ -10,9 +10,18 @@
 import type { FrameNode, Node } from "@orim/schema";
 import type { Rect } from "./camera";
 
-export const CHIP_H = 18;
-export const AGG_CHIP_H = 20;
-const CHAR_W = 6.1; // estimated px per character at chip font size
+export const CHIP_H = 20;
+export const AGG_CHIP_H = 21;
+export const CHIP_PAD = 8;
+export const CHIP_GAP_KV = 4;
+
+/** Text measurer for chip layout. The app installs a real canvas
+ *  measurer at startup so drawn text and hit rects agree to the pixel;
+ *  the default estimate keeps this module Node-safe. */
+let measure: (text: string, bold: boolean) => number = (t) => t.length * 6.1;
+export function setChipMeasurer(fn: (text: string, bold: boolean) => number): void {
+  measure = fn;
+}
 
 export type AggOp = "sum" | "avg" | "min" | "max" | "count";
 export const AGG_OPS: AggOp[] = ["sum", "avg", "min", "max", "count"];
@@ -28,12 +37,27 @@ export function numericFields(n: Node): [string, number][] {
   );
 }
 
-export const formatFieldValue = (v: number): string =>
-  Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+/** Board currency symbol, applied to currency-shaped field names. */
+let currency = "$";
+export function setFieldCurrency(symbol: string): void {
+  currency = symbol;
+}
+const CURRENCY_KEY = /cost|price|budget|revenue|spend|amount|fee/i;
+
+export const formatFieldValue = (v: number, key?: string): string => {
+  const rounded = Number.isInteger(v) ? v : Math.round(v * 100) / 100;
+  if (key && currency && CURRENCY_KEY.test(key)) {
+    return `${currency}${rounded.toLocaleString("en-US")}`;
+  }
+  return String(rounded);
+};
 
 export interface FieldChip {
   key: string;
   value: number;
+  valueLabel: string;
+  /** Measured width of the key part, for two-tone drawing. */
+  keyW: number;
   label: string;
   rect: Rect;
 }
@@ -43,13 +67,18 @@ export function fieldChips(n: Node): FieldChip[] {
   if (n.type !== "sticky" && n.type !== "shape") return [];
   const chips: FieldChip[] = [];
   let x = n.x + 8;
-  const y = n.y + n.h - CHIP_H - 7;
+  const y = n.y + n.h - CHIP_H - 8;
   for (const [key, value] of numericFields(n).slice(0, 4)) {
-    const label = `${key} ${formatFieldValue(value)}`;
-    const w = label.length * CHAR_W + 12;
-    if (x + w > n.x + n.w - 6) break;
-    chips.push({ key, value, label, rect: { x, y, w, h: CHIP_H } });
-    x += w + 5;
+    const valueLabel = formatFieldValue(value, key);
+    const keyW = measure(key, false);
+    const w = CHIP_PAD + keyW + CHIP_GAP_KV + measure(valueLabel, true) + CHIP_PAD;
+    if (x + w > n.x + n.w - 8) break;
+    chips.push({
+      key, value, valueLabel, keyW,
+      label: `${key} ${valueLabel}`,
+      rect: { x, y, w, h: CHIP_H },
+    });
+    x += w + 6;
   }
   return chips;
 }
@@ -99,7 +128,7 @@ export function frameAggregates(frame: FrameNode, children: Node[]): FrameAggreg
     const value = compute(op, values);
     aggs.push({
       field, op, value,
-      label: `${field} ${AGG_SYMBOL[op]} ${formatFieldValue(value)}`,
+      label: `${field} ${AGG_SYMBOL[op]} ${formatFieldValue(value, op === "count" ? undefined : field)}`,
       rect: { x: 0, y: 0, w: 0, h: 0 },
     });
   }
@@ -107,7 +136,7 @@ export function frameAggregates(frame: FrameNode, children: Node[]): FrameAggreg
   let right = frame.x + frame.w;
   for (let i = aggs.length - 1; i >= 0; i--) {
     const agg = aggs[i]!;
-    const w = agg.label.length * CHAR_W + 14;
+    const w = measure(agg.label, true) + CHIP_PAD * 2;
     agg.rect = { x: right - w, y: frame.y - AGG_CHIP_H - 6, w, h: AGG_CHIP_H };
     right -= w + 6;
   }

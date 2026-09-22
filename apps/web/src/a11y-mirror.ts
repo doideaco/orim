@@ -242,7 +242,7 @@ export class A11yMirror {
     const votes = this.store.voteTotals().get(n.id);
     if (votes) parts.push(`${votes} vote${votes === 1 ? "" : "s"}`);
     for (const [key, value] of numericFields(n)) {
-      parts.push(`${key} ${formatFieldValue(value)}`);
+      parts.push(`${key} ${formatFieldValue(value, key)}`);
     }
     return parts.join(", ");
   }

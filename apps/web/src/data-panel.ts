@@ -27,7 +27,32 @@ export class DataPanel {
     private onChange: () => void,
   ) {
     this.button.addEventListener("click", () => this.toggle());
+
+    // Board settings row: currency for cost-shaped fields (synced meta).
+    const settings = document.createElement("div");
+    settings.className = "panel-settings";
+    const label = document.createElement("span");
+    label.textContent = "Currency";
+    const select = document.createElement("select");
+    for (const [value, text] of [["", "auto"], ["$", "$"], ["£", "£"], ["€", "€"], ["kr", "kr"], ["¥", "¥"], ["none", "none"]]) {
+      const opt = document.createElement("option");
+      opt.value = value!;
+      opt.textContent = text!;
+      select.appendChild(opt);
+    }
+    select.addEventListener("change", () => {
+      this.store.setMeta(
+        "currency",
+        select.value === "" ? undefined : select.value === "none" ? "" : select.value,
+      );
+      this.onChange();
+    });
+    this.currencySelect = select;
+    settings.append(label, select);
+    this.outline.before(settings);
   }
+
+  private currencySelect!: HTMLSelectElement;
 
   get isOpen(): boolean {
     return this.panel.classList.contains("open");
@@ -51,6 +76,8 @@ export class DataPanel {
   }
 
   refresh(): void {
+    const meta = this.store.getMeta<string>("currency");
+    this.currencySelect.value = meta === undefined ? "" : meta === "" ? "none" : meta;
     const board: ExportBoard = {
       nodes: [...this.store.nodes.values()],
       connectors: [...this.store.connectors.values()],

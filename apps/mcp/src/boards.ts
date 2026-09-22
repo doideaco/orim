@@ -7,6 +7,7 @@ import WebSocket from "ws";
 import * as Y from "yjs";
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
 import { BoardStore } from "@orim/store";
+import { setFieldCurrency } from "@orim/editor";
 import type { ExportBoard } from "@orim/convert";
 
 const SYNC_URL = process.env.ORIM_SYNC_URL ?? "ws://localhost:1234";
@@ -68,6 +69,7 @@ async function connect(name: string): Promise<OpenBoard> {
 }
 
 export function toExportBoard(store: BoardStore, title: string): ExportBoard {
+  setFieldCurrency(store.getMeta<string>("currency") ?? "$");
   return {
     title,
     nodes: [...store.nodes.values()],
