@@ -5,6 +5,10 @@
 <p align="center"><strong>The open, structured, agent-native visual canvas.</strong><br/>
 (Yes, it's Miro backwards.)</p>
 
+<p align="center">
+  <img src="docs/hero.gif" alt="Dropping team.csv on the canvas builds a laid-out org chart" width="720" />
+</p>
+
 ---
 
 Miro, Mural and FigJam treat the canvas as a **picture**: a bag of objects whose
