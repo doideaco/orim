@@ -190,6 +190,42 @@
       #menu-dropdown button:hover { background: rgba(0, 0, 0, 0.06); }
       #menu-dropdown button.active { background: var(--accent); color: #fff; }
 
+      #datapanel .view-toggle { margin: 10px 14px 0; }
+      #datapanel .code-view {
+        flex: 1;
+        display: flex; flex-direction: column;
+        min-height: 0;
+        margin: 10px 14px 14px;
+        gap: 8px;
+      }
+      #datapanel .code-view[hidden] { display: none; }
+      #datapanel .code-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        font-size: 11.5px; color: #9ca3af;
+      }
+      #datapanel .code-bar button {
+        font: inherit; font-size: 11.5px;
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 7px;
+        padding: 3px 10px;
+        cursor: pointer;
+      }
+      #datapanel .code-bar button:hover { background: #f3f3f1; }
+      #datapanel .code-view pre {
+        flex: 1;
+        margin: 0;
+        overflow: auto;
+        background: #1f2430;
+        color: #cdd3de;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 11px;
+        line-height: 1.55;
+        white-space: pre;
+      }
+
       #drafts-panel {
         position: fixed;
         left: 12px; bottom: 52px;

@@ -52,6 +52,72 @@ export class DataPanel {
     this.currencySelect = select;
     settings.append(label, select);
     this.outline.before(settings);
+
+    // Data ↔ Code: the same board as an outline or as live JSON.
+    const viewToggle = document.createElement("div");
+    viewToggle.className = "segmented view-toggle";
+    for (const mode of ["data", "code"] as const) {
+      const b = document.createElement("button");
+      b.textContent = mode === "data" ? "Data" : "Code";
+      b.classList.toggle("active", this.view === mode);
+      b.addEventListener("click", () => {
+        this.view = mode;
+        for (const sib of viewToggle.children) {
+          sib.classList.toggle("active", sib === b);
+        }
+        this.refresh();
+      });
+      viewToggle.appendChild(b);
+    }
+    settings.before(viewToggle);
+
+    this.codeView = document.createElement("div");
+    this.codeView.className = "code-view";
+    this.codeView.hidden = true;
+    const codeBar = document.createElement("div");
+    codeBar.className = "code-bar";
+    this.codeScope = document.createElement("span");
+    const copy = document.createElement("button");
+    copy.textContent = "Copy";
+    copy.addEventListener("click", () => {
+      void navigator.clipboard?.writeText(this.codePre.textContent ?? "");
+      copy.textContent = "Copied";
+      setTimeout(() => (copy.textContent = "Copy"), 1200);
+    });
+    codeBar.append(this.codeScope, copy);
+    this.codePre = document.createElement("pre");
+    this.codeView.append(codeBar, this.codePre);
+    this.inspector.after(this.codeView);
+  }
+
+  private view: "data" | "code" = "data";
+  private codeView!: HTMLElement;
+  private codePre!: HTMLElement;
+  private codeScope!: HTMLElement;
+
+  /** Live JSON of the selection (or the whole board): the "canvas is a
+   *  document" thesis, visible — drag something and watch it change. */
+  private renderCodeView(): void {
+    const selected = [...this.editor.selection];
+    const scoped = selected.length > 0;
+    const nodes = scoped
+      ? selected.map((id) => this.store.getNode(id)).filter((n): n is Node => !!n)
+      : [...this.store.nodes.values()];
+    const ids = new Set(nodes.map((n) => n.id));
+    const connectors = [...this.store.connectors.values()].filter(
+      (c) =>
+        !scoped ||
+        ("node" in c.from && ids.has(c.from.node)) ||
+        ("node" in c.to && ids.has(c.to.node)),
+    );
+    this.codeScope.textContent = scoped
+      ? `selection — ${nodes.length} object${nodes.length === 1 ? "" : "s"}`
+      : `whole board — ${nodes.length} objects, ${connectors.length} connections`;
+    const json = JSON.stringify({ nodes, connectors }, null, 2);
+    this.codePre.textContent =
+      json.length > 400_000
+        ? `${json.slice(0, 400_000)}\n… truncated — select fewer objects or export JSON`
+        : json;
   }
 
   private currencySelect!: HTMLSelectElement;
@@ -80,6 +146,15 @@ export class DataPanel {
   refresh(): void {
     const meta = this.store.getMeta<string>("currency");
     this.currencySelect.value = meta === undefined ? "" : meta === "" ? "none" : meta;
+
+    const code = this.view === "code";
+    this.codeView.hidden = !code;
+    this.outline.hidden = code;
+    this.inspector.hidden = code;
+    if (code) {
+      this.renderCodeView();
+      return;
+    }
     const board: ExportBoard = {
       nodes: [...this.store.nodes.values()],
       connectors: [...this.store.connectors.values()],
