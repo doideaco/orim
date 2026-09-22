@@ -62,6 +62,97 @@ export async function layered(
   return out;
 }
 
+/**
+ * Tidy tree (Reingold–Tilford style) for strict hierarchies — org charts,
+ * outlines. Children stay grouped and ordered under their parent, and every
+ * parent sits centered over its subtree, which generic layered layout does
+ * not guarantee. Non-tree edges (second parents, cycles) are ignored.
+ */
+export function tree(
+  nodes: Node[],
+  connectors: Connector[],
+  options: { hGap?: number; vGap?: number } = {},
+): Map<string, Position> {
+  if (nodes.length < 2) return new Map();
+  const hGap = options.hGap ?? 36;
+  const vGap = options.vGap ?? 88;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const children = new Map<string, string[]>();
+  const hasParent = new Set<string>();
+  for (const c of connectors) {
+    if (!("node" in c.from) || !("node" in c.to)) continue;
+    const from = c.from.node;
+    const to = c.to.node;
+    if (!byId.has(from) || !byId.has(to) || from === to || hasParent.has(to)) continue;
+    hasParent.add(to);
+    if (!children.has(from)) children.set(from, []);
+    children.get(from)!.push(to);
+  }
+  const roots = nodes.filter((n) => !hasParent.has(n.id)).map((n) => n.id);
+  if (!roots.length) return new Map(); // pure cycle: let the caller fall back
+
+  // Subtree spans, post-order (iterative-safe via memo + cycle guard).
+  const span = new Map<string, number>();
+  const measuring = new Set<string>();
+  const measure = (id: string): number => {
+    const memo = span.get(id);
+    if (memo !== undefined) return memo;
+    if (measuring.has(id)) return byId.get(id)!.w;
+    measuring.add(id);
+    const kids = children.get(id) ?? [];
+    const kidsW = kids.reduce((s, k, i) => s + measure(k) + (i ? hGap : 0), 0);
+    const w = Math.max(byId.get(id)!.w, kidsW);
+    span.set(id, w);
+    measuring.delete(id);
+    return w;
+  };
+
+  // Row heights per depth, so uneven nodes stay on shared baselines.
+  const depth = new Map<string, number>();
+  const queue: [string, number][] = roots.map((r) => [r, 0]);
+  while (queue.length) {
+    const [id, d] = queue.shift()!;
+    if (depth.has(id)) continue;
+    depth.set(id, d);
+    for (const k of children.get(id) ?? []) queue.push([k, d + 1]);
+  }
+  const rowH: number[] = [];
+  for (const [id, d] of depth) rowH[d] = Math.max(rowH[d] ?? 0, byId.get(id)!.h);
+  const rowY: number[] = [];
+  let nextY = 0;
+  rowH.forEach((h, d) => {
+    rowY[d] = nextY;
+    nextY += h + vGap;
+  });
+
+  const out = new Map<string, Position>();
+  const place = (id: string, left: number): void => {
+    if (out.has(id)) return;
+    const n = byId.get(id)!;
+    const w = measure(id);
+    const d = depth.get(id) ?? 0;
+    out.set(id, {
+      x: left + (w - n.w) / 2,
+      y: rowY[d]! + (rowH[d]! - n.h) / 2,
+    });
+    const kids = children.get(id) ?? [];
+    const kidsW = kids.reduce((s, k, i) => s + measure(k) + (i ? hGap : 0), 0);
+    let cursor = left + (w - kidsW) / 2;
+    for (const k of kids) {
+      place(k, cursor);
+      cursor += measure(k) + hGap;
+    }
+  };
+  let left = 0;
+  for (const r of roots) {
+    place(r, left);
+    left += measure(r) + hGap * 2;
+  }
+
+  const anchor = anchorOf(nodes);
+  return new Map([...out].map(([id, p]) => [id, { x: anchor.x + p.x, y: anchor.y + p.y }]));
+}
+
 /** Pack nodes into a grid (reading order preserved), e.g. to tidy stickies. */
 export function grid(
   nodes: Node[],

@@ -190,8 +190,8 @@ export function inferPlan(grid: ImportedGrid): ImportPlan {
 export interface BuiltImport {
   nodes: Node[];
   connectors: Connector[];
-  /** ELK direction when the result needs auto-layout. */
-  layout: "RIGHT" | "DOWN" | "LEFT" | "UP" | null;
+  /** ELK direction when the result needs auto-layout; TREE = tidy tree. */
+  layout: "RIGHT" | "DOWN" | "LEFT" | "UP" | "TREE" | null;
   summary: string;
 }
 
@@ -255,15 +255,17 @@ export function buildFromGrid(grid: ImportedGrid, plan: ImportPlan, opts: BuildO
         const id = row[plan.idCol];
         const parent = row[plan.parentCol];
         if (!id || !parent || !byLabel.has(parent)) continue;
+        // Reporting lines always leave the parent's bottom and enter the
+        // child's top — an org chart should read strictly downward.
         connectors.push({
           id: newId(), type: "connector",
-          from: { node: byLabel.get(parent)!, anchor: "auto" },
-          to: { node: byLabel.get(id)!, anchor: "auto" },
+          from: { node: byLabel.get(parent)!, anchor: "s" },
+          to: { node: byLabel.get(id)!, anchor: "n" },
           label: "", style: "arrow", index, data: {},
         });
       }
       return {
-        nodes, connectors, layout: "DOWN",
+        nodes, connectors, layout: "TREE",
         summary: `Org chart: ${nodes.length} nodes, ${connectors.length} reporting lines`,
       };
     }

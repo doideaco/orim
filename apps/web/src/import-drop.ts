@@ -11,7 +11,7 @@ import {
   type BuiltImport, type ImportedGrid,
 } from "@orim/convert";
 import { cameraToFit, toWorld, type Camera, type Editor } from "@orim/editor";
-import { layered } from "@orim/layout";
+import { layered, tree } from "@orim/layout";
 import type { BoardStore } from "@orim/store";
 
 interface DropDeps {
@@ -47,10 +47,12 @@ async function gridFromFile(file: File): Promise<ImportedGrid | null> {
 async function insertBuilt(deps: DropDeps, built: BuiltImport, sourceLabel: string): Promise<void> {
   const { store, editor, camera } = deps;
   if (built.layout) {
-    const positions = await layered(built.nodes, built.connectors, {
-      direction: built.layout,
-      spacing: 40,
-    });
+    const positions = built.layout === "TREE"
+      ? tree(built.nodes, built.connectors)
+      : await layered(built.nodes, built.connectors, {
+          direction: built.layout,
+          spacing: 40,
+        });
     for (const n of built.nodes) {
       const p = positions.get(n.id);
       if (p) {
