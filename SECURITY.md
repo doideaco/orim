@@ -68,8 +68,10 @@ claimed. Board listings only show boards the caller can access.
 An append-only `audit` table records sign-ups, logins (including
 failures), logouts, SSO sign-ins, board connections (user, board, role),
 denied connection attempts, and share/grant/rename/delete operations
-with timestamps. Readable by admins at `GET /audit` (bearer auth), or
-directly from SQLite for SIEM ingestion.
+with timestamps. Admins can browse and filter it in the admin console at
+`/admin` (which also manages users, roles and sessions), read it at
+`GET /audit` (bearer auth), or ingest it into a SIEM directly from
+SQLite.
 
 ## Deployment hardening checklist
 

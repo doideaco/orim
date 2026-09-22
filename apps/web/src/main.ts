@@ -14,6 +14,8 @@ if (ssoMatch) {
 
 if (new URLSearchParams(location.search).get("b")) {
   void import("./board-app");
+} else if (location.pathname === "/admin") {
+  void import("./admin-page").then((m) => m.renderAdminPage());
 } else {
   void import("./start-page").then((m) => m.renderStartPage());
 }

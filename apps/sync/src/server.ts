@@ -308,7 +308,8 @@ const server = new Server({
     const api =
       url.pathname.startsWith("/boards") ||
       url.pathname.startsWith("/auth") ||
-      url.pathname.startsWith("/audit");
+      url.pathname.startsWith("/audit") ||
+      url.pathname.startsWith("/admin/");
     if (!api) {
       // Single-container mode: serve the built web app.
       if (webDist && request.method === "GET" && serveStatic(webDist, url.pathname, response)) {
@@ -407,12 +408,99 @@ const server = new Server({
       if (request.method === "GET" && url.pathname === "/audit") {
         if (!user?.isAdmin) return send(403, { error: "admin only" });
         const limit = Math.min(1000, Number(url.searchParams.get("limit") ?? 200));
-        const board = url.searchParams.get("board");
-        const rows = board
-          ? db.prepare("SELECT * FROM audit WHERE board = ? ORDER BY id DESC LIMIT ?")
-              .all(board, limit)
-          : db.prepare("SELECT * FROM audit ORDER BY id DESC LIMIT ?").all(limit);
+        const where: string[] = [];
+        const params: (string | number)[] = [];
+        for (const key of ["board", "user", "action"] as const) {
+          const v = url.searchParams.get(key);
+          if (v) {
+            where.push(`"${key}" = ?`);
+            params.push(v);
+          }
+        }
+        const before = Number(url.searchParams.get("before") ?? 0);
+        if (before > 0) {
+          where.push("id < ?");
+          params.push(before);
+        }
+        const rows = db
+          .prepare(
+            `SELECT * FROM audit ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+             ORDER BY id DESC LIMIT ?`,
+          )
+          .all(...params, limit);
         return send(200, rows);
+      }
+
+      // --- admin console ---
+      if (url.pathname.startsWith("/admin/")) {
+        if (!user?.isAdmin) return send(403, { error: "admin only" });
+        const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+
+        if (request.method === "GET" && url.pathname === "/admin/overview") {
+          return send(200, {
+            users: count("SELECT COUNT(*) AS n FROM users"),
+            boards: count("SELECT COUNT(*) AS n FROM boards"),
+            sessions: (db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE created_at > ?")
+              .get(Date.now() - SESSION_TTL) as { n: number }).n,
+            auditRows: count("SELECT COUNT(*) AS n FROM audit"),
+          });
+        }
+        if (request.method === "GET" && url.pathname === "/admin/users") {
+          const rows = db
+            .prepare(
+              `SELECT u.id, u.name, u.created_at AS createdAt,
+                      u.is_admin AS isAdmin, (u.pass = 'oidc') AS sso,
+                      (SELECT COUNT(*) FROM sessions s
+                       WHERE s.user_id = u.id AND s.created_at > ?) AS sessions,
+                      (SELECT MAX(a.at) FROM audit a WHERE a.user = u.name) AS lastActive
+               FROM users u ORDER BY u.created_at`,
+            )
+            .all(Date.now() - SESSION_TTL) as Record<string, unknown>[];
+          return send(200, rows.map((r) => ({ ...r, isAdmin: r.isAdmin === 1, sso: r.sso === 1 })));
+        }
+
+        const target = (name: string) =>
+          db.prepare("SELECT id, name, is_admin AS isAdmin FROM users WHERE name = ?")
+            .get(name) as { id: number; name: string; isAdmin: number } | undefined;
+        const adminCount = () => count("SELECT COUNT(*) AS n FROM users WHERE is_admin = 1");
+
+        if (request.method === "POST" && url.pathname === "/admin/users/role") {
+          const { name, isAdmin } = JSON.parse(await readBody(request)) as {
+            name?: string; isAdmin?: boolean;
+          };
+          const t = name ? target(name) : undefined;
+          if (!t) return send(404, { error: "no such user" });
+          if (!isAdmin && t.isAdmin === 1 && adminCount() === 1) {
+            return send(400, { error: "Orim needs at least one admin." });
+          }
+          db.prepare("UPDATE users SET is_admin = ? WHERE id = ?").run(isAdmin ? 1 : 0, t.id);
+          audit(user.name, isAdmin ? "admin.promote" : "admin.demote", null, t.name);
+          return send(200, { ok: true });
+        }
+        if (request.method === "POST" && url.pathname === "/admin/users/signout") {
+          const { name } = JSON.parse(await readBody(request)) as { name?: string };
+          const t = name ? target(name) : undefined;
+          if (!t) return send(404, { error: "no such user" });
+          db.prepare("DELETE FROM sessions WHERE user_id = ?").run(t.id);
+          audit(user.name, "admin.signout", null, t.name);
+          return send(200, { ok: true });
+        }
+        if (request.method === "DELETE" && url.pathname === "/admin/users") {
+          const name = url.searchParams.get("name");
+          const t = name ? target(name) : undefined;
+          if (!t) return send(404, { error: "no such user" });
+          if (t.id === user.id) return send(400, { error: "You can't delete yourself." });
+          if (t.isAdmin === 1 && adminCount() === 1) {
+            return send(400, { error: "Orim needs at least one admin." });
+          }
+          // Their boards survive as unclaimed; access grants and sessions go.
+          db.prepare("DELETE FROM sessions WHERE user_id = ?").run(t.id);
+          db.prepare("DELETE FROM board_roles WHERE user_id = ?").run(t.id);
+          db.prepare("UPDATE board_settings SET owner_id = NULL WHERE owner_id = ?").run(t.id);
+          db.prepare("DELETE FROM users WHERE id = ?").run(t.id);
+          audit(user.name, "admin.user.delete", null, t.name);
+          return send(200, { ok: true });
+        }
       }
 
       // --- boards ---

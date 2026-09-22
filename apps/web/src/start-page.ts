@@ -115,6 +115,7 @@ export async function renderStartPage(): Promise<void> {
       <img src="/orim.svg" alt="Orim" />
       <div class="header-actions">
         <span id="account-name"></span>
+        <button id="admin-btn" hidden>Admin</button>
         <button id="account-btn"></button>
         <button id="new-board" class="primary">New board</button>
       </div>
@@ -136,6 +137,15 @@ export async function renderStartPage(): Promise<void> {
         if (name?.trim()) openBoard(slugify(name));
       });
   });
+
+  const adminBtn = root.querySelector<HTMLButtonElement>("#admin-btn")!;
+  adminBtn.addEventListener("click", () => { location.href = "/admin"; });
+  if (authName()) {
+    void fetch(`${API}/auth/me`, { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((me: { isAdmin?: boolean }) => { adminBtn.hidden = !me.isAdmin; })
+      .catch(() => { /* offline */ });
+  }
 
   const accountBtn = root.querySelector<HTMLButtonElement>("#account-btn")!;
   const accountName = root.querySelector<HTMLElement>("#account-name")!;
