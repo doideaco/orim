@@ -4,6 +4,7 @@
  * bullets in reading order, connections become an explicit list.
  */
 import type { Connector, Endpoint, Node } from "@orim/schema";
+import { formatFieldValue, frameAggregates, numericFields } from "@orim/editor";
 import { orderBoard, nodeLabel, type ExportBoard } from "./order";
 
 function bullet(n: Node): string {
@@ -31,13 +32,22 @@ export function boardToMarkdown(board: ExportBoard): string {
   const lines: string[] = [`# ${board.title ?? "Untitled board"}`, ""];
 
   const withVotes = (n: Node, block: string[]): string[] => {
+    if (!block[0]?.startsWith("- ")) return block;
+    const parts: string[] = [];
     const votes = board.votes?.[n.id];
-    if (!votes || !block[0]?.startsWith("- ")) return block;
-    return [`${block[0]} — ${votes} vote${votes === 1 ? "" : "s"}`, ...block.slice(1)];
+    if (votes) parts.push(`${votes} vote${votes === 1 ? "" : "s"}`);
+    for (const [key, value] of numericFields(n)) {
+      parts.push(`${key}: ${formatFieldValue(value)}`);
+    }
+    if (!parts.length) return block;
+    return [`${block[0]} — ${parts.join(" · ")}`, ...block.slice(1)];
   };
 
   for (const { frame, children } of ordered.frames) {
-    lines.push(`## ${frame.title}`, "");
+    const aggs = frameAggregates(frame, children)
+      .map((a) => a.label)
+      .join(" · ");
+    lines.push(`## ${frame.title}${aggs ? ` — ${aggs}` : ""}`, "");
     for (const child of children) lines.push(...withVotes(child, nodeBlock(child)));
     if (children.length) lines.push("");
   }

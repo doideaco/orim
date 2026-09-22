@@ -48,6 +48,15 @@ decision.
 - Every object carries a free-form `data` bag, editable in the Data panel —
   a sticky on a blueprint can carry an SLA
 
+**Smart fields**
+- Put a number on a sticky (`estimate: 5`, `cost: 1200`) and it renders as
+  a chip; put several inside a frame and the frame **computes the
+  aggregate with zero config** — click the chip to cycle Σ/avg/min/max/#.
+  Numeric table columns grow a totals footer. Sprint capacity, budget
+  workshops and RICE scoring fall out for free, and agents can write
+  fields over MCP ("estimate these 20 stickies")
+- Field values flow into Markdown exports and the accessibility tree
+
 **Import — the magic trick**
 - **Drop a CSV/TSV/Excel file** on the canvas and Orim infers the right
   diagram from the data's shape:

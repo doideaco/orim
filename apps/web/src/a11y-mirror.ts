@@ -14,6 +14,7 @@
  */
 import type { Connector, Node, TableNode } from "@orim/schema";
 import { orderBoard, nodeLabel, type ExportBoard } from "@orim/convert";
+import { formatFieldValue, frameAggregates, numericFields } from "@orim/editor";
 import type { BoardStore } from "@orim/store";
 import type { Camera, Editor } from "@orim/editor";
 
@@ -170,7 +171,11 @@ export class A11yMirror {
     this.tree.replaceChildren();
 
     for (const { frame, children } of ordered.frames) {
-      const item = this.makeItem(frame, 1, `${describe(frame)}, ${children.length} items`);
+      const aggs = frameAggregates(frame, children).map((a) => a.label).join(", ");
+      const item = this.makeItem(
+        frame, 1,
+        `${describe(frame)}, ${children.length} items${aggs ? `, ${aggs}` : ""}`,
+      );
       if (children.length && !this.collapsed.has(frame.id)) {
         const group = document.createElement("div");
         group.setAttribute("role", "group");
@@ -233,8 +238,13 @@ export class A11yMirror {
   }
 
   private describeWithVotes(n: Node): string {
+    const parts = [describe(n)];
     const votes = this.store.voteTotals().get(n.id);
-    return votes ? `${describe(n)}, ${votes} vote${votes === 1 ? "" : "s"}` : describe(n);
+    if (votes) parts.push(`${votes} vote${votes === 1 ? "" : "s"}`);
+    for (const [key, value] of numericFields(n)) {
+      parts.push(`${key} ${formatFieldValue(value)}`);
+    }
+    return parts.join(", ");
   }
 
   private buildNode(n: Node, level: number): HTMLElement {

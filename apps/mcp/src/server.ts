@@ -246,6 +246,8 @@ server.tool(
         title: z.string().optional(),
         color,
         parent: z.string().nullable().optional(),
+        data: z.record(z.string(), z.unknown()).optional()
+          .describe("Merged into the node's data bag. Numeric fields render as chips and frames aggregate them automatically."),
       }),
     ),
   },
@@ -253,12 +255,14 @@ server.tool(
     const { store } = await openBoard(board);
     let applied = 0;
     store.transact(() => {
-      for (const { id, ...patch } of updates) {
-        if (!store.getNode(id)) continue;
+      for (const { id, data, ...patch } of updates) {
+        const existing = store.getNode(id);
+        if (!existing) continue;
         const clean = Object.fromEntries(
           Object.entries(patch).filter(([, v]) => v !== undefined),
-        );
-        store.updateNode(id, clean as Partial<Node>);
+        ) as Partial<Node>;
+        if (data) clean.data = { ...existing.data, ...data };
+        store.updateNode(id, clean);
         applied++;
       }
     });

@@ -1,7 +1,8 @@
 import type { Connector, Node, NodeId } from "@orim/schema";
 import {
-  elbowRoute, nodeRect, routeConnector, visibleWorldRect, toScreen,
-  tableColumnEdges, TABLE_ROW_H,
+  elbowRoute, fieldChips, formatFieldValue, frameAggregates, nodeRect,
+  routeConnector, tableColumnEdges, tableColumnTotals, visibleWorldRect,
+  toScreen, TABLE_ROW_H,
   type Camera, type Point, type Rect,
 } from "@orim/editor";
 import type { BoardComment, TableNode } from "@orim/schema";
@@ -109,6 +110,18 @@ export class Renderer {
     const inView = (n: { x: number; y: number; w: number; h: number }) =>
       !(n.x > view.maxX || n.y > view.maxY || n.x + n.w < view.minX || n.y + n.h < view.minY);
 
+    // Children per frame (for aggregate chips), one pass.
+    const childrenByParent = new Map<NodeId, typeof scene.nodesSorted[number][]>();
+    for (const n of scene.nodesSorted) {
+      if (!n.parent) continue;
+      let list = childrenByParent.get(n.parent);
+      if (!list) {
+        list = [];
+        childrenByParent.set(n.parent, list);
+      }
+      list.push(n);
+    }
+
     // Pass 1: frames (always behind content).
     for (const n of scene.nodesSorted) {
       if (n.type !== "frame" || !inView(n)) continue;
@@ -123,6 +136,18 @@ export class Renderer {
         ctx.font = `600 13px ${FONT_STACK}`;
         ctx.textBaseline = "alphabetic";
         ctx.fillText(n.title, n.x + 1, n.y - 8 / z);
+        // Zero-config aggregates over the children's numeric fields.
+        for (const agg of frameAggregates(n, childrenByParent.get(n.id) ?? [])) {
+          ctx.fillStyle = "#ECECEA";
+          ctx.beginPath();
+          ctx.roundRect(agg.rect.x, agg.rect.y, agg.rect.w, agg.rect.h, agg.rect.h / 2);
+          ctx.fill();
+          ctx.fillStyle = "#4B5563";
+          ctx.font = `600 11px ${FONT_STACK}`;
+          ctx.textBaseline = "middle";
+          ctx.fillText(agg.label, agg.rect.x + 7, agg.rect.y + agg.rect.h / 2 + 1);
+          ctx.textBaseline = "alphabetic";
+        }
       }
     }
 
@@ -152,6 +177,7 @@ export class Renderer {
           if (drawText && n.id !== scene.editingId && n.text) {
             this.drawWrappedText(n.id, n.text, n, color.text, FONT_SIZE, true);
           }
+          if (drawText) this.drawFieldChips(n, color.text);
           break;
         }
         case "shape": {
@@ -167,6 +193,7 @@ export class Renderer {
           if (drawText && n.id !== scene.editingId && n.text) {
             this.drawWrappedText(n.id, n.text, n, color.text, FONT_SIZE, true);
           }
+          if (drawText) this.drawFieldChips(n, color.text);
           break;
         }
         case "text": {
@@ -587,6 +614,38 @@ export class Renderer {
     ctx.fillStyle = "#6B7280";
     ctx.textBaseline = "alphabetic";
     ctx.fillText(n.title, n.x + 1, n.y - 8 / z);
+    // Numeric column totals as a ghost footer.
+    const totals = tableColumnTotals(n);
+    if (totals.length) {
+      const edges = tableColumnEdges(n);
+      ctx.font = `600 11px ${FONT_STACK}`;
+      ctx.fillStyle = "#6B7280";
+      for (const t of totals) {
+        ctx.fillText(
+          `Σ ${formatFieldValue(t.sum)}`,
+          n.x + edges[t.colIndex]! + 10,
+          n.y + n.h + 15,
+        );
+      }
+    }
+    ctx.textBaseline = "top";
+  }
+
+  /** Smart-field chips along a node's bottom edge. */
+  private drawFieldChips(n: Parameters<typeof fieldChips>[0], textColor: string): void {
+    const { ctx } = this;
+    const chips = fieldChips(n);
+    if (!chips.length) return;
+    for (const chip of chips) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.beginPath();
+      ctx.roundRect(chip.rect.x, chip.rect.y, chip.rect.w, chip.rect.h, chip.rect.h / 2);
+      ctx.fill();
+      ctx.fillStyle = textColor;
+      ctx.font = `600 10.5px ${FONT_STACK}`;
+      ctx.textBaseline = "middle";
+      ctx.fillText(chip.label, chip.rect.x + 6, chip.rect.y + chip.rect.h / 2 + 1);
+    }
     ctx.textBaseline = "top";
   }
 

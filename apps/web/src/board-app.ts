@@ -4,7 +4,7 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { BoardStore } from "@orim/store";
 import { cellSource, type PaletteColor } from "@orim/schema";
 import {
-  Editor, cameraToFit, tableCellRect, toScreen, toWorld, zoomAt,
+  Editor, cameraToFit, fieldChips, tableCellRect, toScreen, toWorld, zoomAt,
   type Camera, type ToolName,
 } from "@orim/editor";
 import {
@@ -60,6 +60,7 @@ const editor = new Editor(store, camera, {
     comments.compose(anchor);
     dirty = true;
   },
+  openFieldEditor: (node, key) => openFieldChipEditor(node, key),
   openTextEditor: (node) => {
     if (node.type === "frame") {
       openFrameTitleEditor(node);
@@ -238,6 +239,49 @@ setupPaste({
     dataPanel.scheduleRefresh();
   },
 });
+
+/** Inline editor for a smart-field chip (double-clicked on canvas). */
+function openFieldChipEditor(node: import("@orim/schema").Node, key: string): void {
+  const chip = fieldChips(node).find((c) => c.key === key);
+  if (!chip) return;
+  const s = toScreen(camera, chip.rect);
+  const input = document.createElement("input");
+  input.value = String((node.data as Record<string, unknown>)[key] ?? "");
+  input.style.cssText = `position:absolute; left:${s.x}px; top:${s.y - 4}px;
+    width:${Math.max(64, chip.rect.w * camera.zoom + 24)}px;
+    pointer-events:auto; font:600 12px -apple-system,system-ui,sans-serif;
+    color:#1f2430; padding:3px 8px; border:none; outline:2px solid var(--accent);
+    border-radius:9px; background:#fff;`;
+  document.getElementById("overlay-root")!.appendChild(input);
+  input.focus();
+  input.select();
+  let cancelled = false;
+  const commit = () => {
+    if (!cancelled) {
+      const live = store.getNode(node.id);
+      if (live) {
+        const raw = input.value.trim();
+        const num = Number(raw);
+        const data = { ...live.data } as Record<string, unknown>;
+        if (raw === "") delete data[key];
+        else data[key] = Number.isFinite(num) && raw !== "" ? num : raw;
+        store.updateNode(node.id, { data });
+      }
+    }
+    input.remove();
+    dirty = true;
+    dataPanel.scheduleRefresh();
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") input.blur();
+    if (e.key === "Escape") {
+      cancelled = true;
+      input.blur();
+    }
+  });
+}
 
 // --- sync --------------------------------------------------------------------
 

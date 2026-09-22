@@ -345,35 +345,109 @@ export class DataPanel {
 
     if (node.type === "table") this.renderTableActions(node);
 
+    this.renderFieldRows(node);
+  }
+
+  /** Structured editor for the data bag: one row per field, add/remove,
+   *  numbers parsed as numbers. Raw JSON stays behind an advanced toggle. */
+  private renderFieldRows(node: Node): void {
     const label = document.createElement("label");
-    label.textContent = "data (JSON) — typed fields on this object";
+    label.textContent = "fields — typed data on this object";
     this.inspector.appendChild(label);
-    const textarea = document.createElement("textarea");
-    textarea.value = JSON.stringify(node.data ?? {}, null, 2);
-    textarea.spellcheck = false;
-    this.inspector.appendChild(textarea);
 
-    const actions = document.createElement("div");
-    actions.className = "actions";
-    const apply = document.createElement("button");
-    apply.textContent = "Apply";
-    const err = document.createElement("span");
-    err.className = "err";
-    actions.append(apply, err);
-    this.inspector.appendChild(actions);
+    const setField = (key: string, raw: string) => {
+      const live = this.store.getNode(node.id);
+      if (!live) return;
+      const data = { ...live.data } as Record<string, unknown>;
+      const trimmed = raw.trim();
+      const num = Number(trimmed);
+      if (trimmed === "") delete data[key];
+      else data[key] = Number.isFinite(num) ? num : trimmed;
+      this.store.updateNode(node.id, { data });
+      this.onChange();
+      this.scheduleRefresh();
+    };
 
-    apply.addEventListener("click", () => {
-      try {
-        const parsed: unknown = JSON.parse(textarea.value);
-        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-          throw new Error("must be a JSON object");
+    const rows = document.createElement("div");
+    rows.className = "field-rows";
+    const entries = Object.entries(node.data ?? {}).filter(([k]) => !k.startsWith("$"));
+    for (const [key, value] of entries) {
+      const row = document.createElement("div");
+      row.className = "field-row";
+      const name = document.createElement("span");
+      name.textContent = key;
+      const input = document.createElement("input");
+      input.value = typeof value === "string" || typeof value === "number" ? String(value) : JSON.stringify(value);
+      input.addEventListener("keydown", (e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") input.blur();
+      });
+      input.addEventListener("blur", () => setField(key, input.value));
+      const del = document.createElement("button");
+      del.textContent = "✕";
+      del.setAttribute("aria-label", `Remove field ${key}`);
+      del.addEventListener("click", () => setField(key, ""));
+      row.append(name, input, del);
+      rows.appendChild(row);
+    }
+    this.inspector.appendChild(rows);
+
+    const addRow = document.createElement("div");
+    addRow.className = "field-row add";
+    const keyInput = document.createElement("input");
+    keyInput.placeholder = "field";
+    const valInput = document.createElement("input");
+    valInput.placeholder = "value";
+    const add = () => {
+      const key = keyInput.value.trim();
+      if (!key || key.startsWith("$")) return;
+      setField(key, valInput.value);
+    };
+    for (const input of [keyInput, valInput]) {
+      input.addEventListener("keydown", (e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") add();
+      });
+    }
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "+";
+    addBtn.setAttribute("aria-label", "Add field");
+    addBtn.addEventListener("click", add);
+    addRow.append(keyInput, valInput, addBtn);
+    this.inspector.appendChild(addRow);
+
+    const advanced = document.createElement("button");
+    advanced.className = "linkish";
+    advanced.textContent = "Edit as JSON";
+    this.inspector.appendChild(advanced);
+    advanced.addEventListener("click", () => {
+      advanced.remove();
+      const textarea = document.createElement("textarea");
+      textarea.value = JSON.stringify(node.data ?? {}, null, 2);
+      textarea.spellcheck = false;
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const apply = document.createElement("button");
+      apply.textContent = "Apply";
+      const err = document.createElement("span");
+      err.className = "err";
+      actions.append(apply, err);
+      this.inspector.append(textarea, actions);
+      textarea.addEventListener("keydown", (e) => e.stopPropagation());
+      apply.addEventListener("click", () => {
+        try {
+          const parsed: unknown = JSON.parse(textarea.value);
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error("must be a JSON object");
+          }
+          this.store.updateNode(node.id, { data: parsed as Record<string, unknown> });
+          err.textContent = "";
+          this.onChange();
+          this.scheduleRefresh();
+        } catch (e) {
+          err.textContent = e instanceof Error ? e.message : String(e);
         }
-        this.store.updateNode(node.id, { data: parsed as Record<string, unknown> });
-        err.textContent = "";
-        this.onChange();
-      } catch (e) {
-        err.textContent = e instanceof Error ? e.message : String(e);
-      }
+      });
     });
   }
 }

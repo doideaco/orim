@@ -2,6 +2,7 @@ import type {
   Connector, Endpoint, Node, PaletteColor, ShapeNode, TableNode,
 } from "@orim/schema";
 import { tableCellAt, tableHeight } from "./table-geometry";
+import { fieldChips, frameAggregates, nextAggOp, type AggOp } from "./fields";
 import type { BoardStore } from "@orim/store";
 import type { Camera, Point, Rect } from "./camera";
 import {
@@ -25,6 +26,8 @@ export interface EditorHooks {
   openTableCell(table: TableNode, rowIndex: number, colIndex: number): void;
   /** Start a new comment thread at a node or a free point. */
   openCommentComposer(anchor: { node: string } | { point: Point }): void;
+  /** Edit one data field on a node (smart-field chip double-clicked). */
+  openFieldEditor(node: Node, key: string): void;
   defaultColor(): PaletteColor;
   defaultFillStyle(): ShapeNode["fillStyle"];
 }
@@ -207,6 +210,8 @@ export class Editor {
           this.drag = { kind: "resize", id: node.id, handle, orig: nodeRect(node) };
           return;
         }
+        // Clicking a frame's aggregate chip cycles its operation.
+        if (this.cycleAggChipAt(world)) return;
         // Dragging from a port starts a connector without switching tools.
         const port = this.portAt(screen);
         if (port) {
@@ -510,9 +515,37 @@ export class Editor {
     }
   }
 
+  private cycleAggChipAt(p: Point): boolean {
+    for (const frame of this.store.nodesSorted) {
+      if (frame.type !== "frame") continue;
+      if (p.y < frame.y - 30 || p.y > frame.y || p.x < frame.x || p.x > frame.x + frame.w) {
+        continue;
+      }
+      for (const agg of frameAggregates(frame, this.store.childrenOf(frame.id))) {
+        if (rectContains(agg.rect, p)) {
+          const prefs = ((frame.data as { $agg?: Record<string, AggOp> }).$agg) ?? {};
+          this.store.updateNode(frame.id, {
+            data: { ...frame.data, $agg: { ...prefs, [agg.field]: nextAggOp(agg.op) } },
+          });
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   dblClick(info: PointerInfo): void {
     if (this.tool !== "select") return;
     const hit = this.hitNode(info.world);
+    if (hit && (hit.type === "sticky" || hit.type === "shape")) {
+      for (const chip of fieldChips(hit)) {
+        if (rectContains(chip.rect, info.world)) {
+          this.selectOnly(hit.id);
+          this.hooks.openFieldEditor(hit, chip.key);
+          return;
+        }
+      }
+    }
     if (hit && hit.type === "table") {
       this.selectOnly(hit.id);
       const cell = tableCellAt(hit, info.world);
