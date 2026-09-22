@@ -208,7 +208,12 @@ interface BuildOpts {
 function rowBag(grid: ImportedGrid, row: string[]): Record<string, unknown> {
   const bag: Record<string, unknown> = {};
   grid.headers.forEach((hdr, i) => {
-    if (row[i]) bag[hdr] = row[i];
+    const value = row[i];
+    if (!value) return;
+    // Numeric cells import as numbers so smart fields light up
+    // immediately: chips on the cards, aggregates on the lanes.
+    const cleaned = value.replace(/[,\s]/g, "");
+    bag[hdr] = /^-?\d+(\.\d+)?$/.test(cleaned) ? Number(cleaned) : value;
   });
   return bag;
 }
