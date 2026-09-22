@@ -28,6 +28,8 @@ export interface EditorHooks {
   openCommentComposer(anchor: { node: string } | { point: Point }): void;
   /** Edit one data field on a node (smart-field chip double-clicked). */
   openFieldEditor(node: Node, key: string): void;
+  /** Add a child node under `parentId` in a tree diagram (Tab / "+"). */
+  addTreeChild(parentId: string): void;
   defaultColor(): PaletteColor;
   defaultFillStyle(): ShapeNode["fillStyle"];
 }
@@ -148,6 +150,33 @@ export class Editor {
 
   /** Connector port under a screen point: edge midpoints of the hovered
    *  or single-selected node. */
+  /** Is this node part of a tree diagram (touches a strict parent→child edge)? */
+  isTreeMember(id: string): boolean {
+    for (const c of this.store.connectors.values()) {
+      if (!("node" in c.from) || !("node" in c.to)) continue;
+      if (c.from.anchor !== "s" || c.to.anchor !== "n") continue;
+      if (c.from.node === id || c.to.node === id) return true;
+    }
+    return false;
+  }
+
+  /** World position of the add-child "+" affordance under a node. */
+  treePlusPos(n: Node): Point {
+    return { x: n.x + n.w / 2, y: n.y + n.h + 26 / this.camera.zoom };
+  }
+
+  /** The single-selected tree node whose "+" affordance is at `screen`. */
+  treePlusAt(screen: Point): string | null {
+    const n = this.singleSelectedNode();
+    if (!n || n.type === "frame" || n.type === "ink" || !this.isTreeMember(n.id)) return null;
+    const world = this.treePlusPos(n);
+    const s = {
+      x: (world.x - this.camera.x) * this.camera.zoom,
+      y: (world.y - this.camera.y) * this.camera.zoom,
+    };
+    return Math.hypot(s.x - screen.x, s.y - screen.y) <= 11 ? n.id : null;
+  }
+
   portAt(screen: Point): { nodeId: string; side: "n" | "s" | "e" | "w" } | null {
     for (const id of [this.hoveredId, this.singleSelectedNode()?.id]) {
       if (!id) continue;
@@ -212,6 +241,12 @@ export class Editor {
         }
         // Clicking a frame's aggregate chip cycles its operation.
         if (this.cycleAggChipAt(world)) return;
+        // The "+" under a selected tree node adds a child.
+        const plusParent = this.treePlusAt(screen);
+        if (plusParent) {
+          this.hooks.addTreeChild(plusParent);
+          return;
+        }
         // Dragging from a port starts a connector without switching tools.
         const port = this.portAt(screen);
         if (port) {

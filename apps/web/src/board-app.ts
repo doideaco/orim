@@ -21,7 +21,7 @@ import { A11yMirror } from "./a11y-mirror";
 import { ORIM_CLIP_MARKER, setupFileDrop, setupPaste } from "./import-drop";
 import { CommentsUI } from "./comments-ui";
 import { api, authName, authToken, openAuthDialog, WS_URL } from "./auth";
-import { findEmptySpace } from "@orim/layout";
+import { findEmptySpace, tree } from "@orim/layout";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
@@ -84,15 +84,18 @@ const editor = new Editor(store, camera, {
     dirty = true;
   },
   openFieldEditor: (node, key) => openFieldChipEditor(node, key),
-  openTextEditor: (node) => {
-    if (node.type === "frame") {
-      openFrameTitleEditor(node);
-    } else if (isEditable(node)) {
-      overlay.open(node, camera, (text) => commitNodeText(node, text));
-    }
-    dirty = true;
-  },
+  addTreeChild: (parentId) => addTreeChild(parentId),
+  openTextEditor: (node) => openNodeTextEditor(node),
 });
+
+function openNodeTextEditor(node: import("@orim/schema").Node): void {
+  if (node.type === "frame") {
+    openFrameTitleEditor(node);
+  } else if (isEditable(node)) {
+    overlay.open(node, camera, (text) => commitNodeText(node, text));
+  }
+  dirty = true;
+}
 
 /** Text commit with cell-binding write-through: a bound node writes to
  *  its source cell and the reconciler updates every bound view. */
@@ -512,6 +515,132 @@ canvas.addEventListener(
   { passive: false },
 );
 
+// --- tree authoring (Tab = child, Enter = sibling, "+" under selection) ------
+
+type TreeEdge = import("@orim/schema").Connector & {
+  from: { node: string; anchor: string };
+  to: { node: string; anchor: string };
+};
+
+/** Strict parent→child edges (bottom → top), the marker of tree diagrams. */
+function treeEdges(): TreeEdge[] {
+  return [...store.connectors.values()].filter(
+    (c): c is TreeEdge =>
+      "node" in c.from && c.from.anchor === "s" &&
+      "node" in c.to && c.to.anchor === "n",
+  );
+}
+
+const treeParentEdgeOf = (id: string): TreeEdge | null =>
+  treeEdges().find((c) => c.to.node === id) ?? null;
+
+/**
+ * Add a connected child under `parentId` and rebalance that whole tree
+ * with the tidy layout. New siblings inherit the last child's look, a
+ * first child inherits its parent's; the child opens ready to type.
+ */
+function addTreeChild(parentId: string): void {
+  if (readOnly) return;
+  const parent = store.getNode(parentId);
+  if (!parent || parent.type === "frame" || parent.type === "ink" || parent.type === "table") {
+    return;
+  }
+  const edges = treeEdges();
+  const siblings = edges
+    .filter((c) => c.from.node === parentId)
+    .map((c) => store.getNode(c.to.node))
+    .filter((n): n is import("@orim/schema").Node => !!n);
+  const template = siblings[siblings.length - 1] ?? parent;
+
+  const id = newId();
+  const base = {
+    id, parent: null, rotation: 0, index: store.topIndex(), locked: false,
+    data: {} as Record<string, unknown>,
+    x: parent.x, y: parent.y + parent.h + 88,
+    w: template.w, h: template.h,
+  };
+  const color = "color" in template && template.color ? template.color : defaultColor;
+  let child: import("@orim/schema").Node;
+  if (template.type === "sticky") {
+    child = { ...base, type: "sticky", text: "", color, author: undefined };
+  } else if (template.type === "text") {
+    child = { ...base, type: "text", text: "", fontSize: template.fontSize };
+  } else {
+    child = {
+      ...base, type: "shape",
+      kind: template.type === "shape" ? template.kind : "rect",
+      text: "", color,
+      fillStyle: template.type === "shape" ? template.fillStyle : defaultFillStyle,
+    };
+  }
+  const edge: TreeEdge = {
+    id: newId(), type: "connector",
+    from: { node: parentId, anchor: "s" },
+    to: { node: id, anchor: "n" },
+    label: "", style: "arrow", index: store.topIndex(), data: {},
+  } as TreeEdge;
+
+  // Rebalance the connected tree component (old edges + the new one).
+  const allEdges = [...edges, edge];
+  const adjacent = new Map<string, string[]>();
+  for (const c of allEdges) {
+    if (!adjacent.has(c.from.node)) adjacent.set(c.from.node, []);
+    if (!adjacent.has(c.to.node)) adjacent.set(c.to.node, []);
+    adjacent.get(c.from.node)!.push(c.to.node);
+    adjacent.get(c.to.node)!.push(c.from.node);
+  }
+  const member = new Set<string>([parentId]);
+  const stack = [parentId];
+  while (stack.length) {
+    for (const nb of adjacent.get(stack.pop()!) ?? []) {
+      if (!member.has(nb)) {
+        member.add(nb);
+        stack.push(nb);
+      }
+    }
+  }
+  const memberNodes = [...member]
+    .map((m) => (m === id ? child : store.getNode(m)))
+    .filter((n): n is import("@orim/schema").Node => !!n);
+  const positions = tree(memberNodes, allEdges);
+
+  store.transact(() => {
+    store.upsertNode(child);
+    store.upsertConnector(edge);
+    for (const n of memberNodes) {
+      const p = positions.get(n.id);
+      if (p && (n.x !== p.x || n.y !== p.y)) store.upsertNode({ ...n, x: p.x, y: p.y });
+    }
+  });
+
+  editor.clearSelection();
+  editor.selection.add(id);
+  const placed = store.getNode(id);
+  if (placed) {
+    ensureOnScreen(placed);
+    openNodeTextEditor(placed);
+  }
+  dirty = true;
+  dataPanel.scheduleRefresh();
+}
+
+/** Nudge the camera the minimal amount to keep a node in view. */
+function ensureOnScreen(n: { x: number; y: number; w: number; h: number }): void {
+  const M = 72;
+  const sx = (n.x - camera.x) * camera.zoom;
+  const sy = (n.y - camera.y) * camera.zoom;
+  const sw = n.w * camera.zoom;
+  const sh = n.h * camera.zoom;
+  if (sx < M) camera.x -= (M - sx) / camera.zoom;
+  if (sy < M) camera.y -= (M - sy) / camera.zoom;
+  if (sx + sw > window.innerWidth - M) {
+    camera.x += (sx + sw - (window.innerWidth - M)) / camera.zoom;
+  }
+  if (sy + sh > window.innerHeight - M) {
+    camera.y += (sy + sh - (window.innerHeight - M)) / camera.zoom;
+  }
+}
+
 // --- keyboard ----------------------------------------------------------------
 
 const TOOL_KEYS: Record<string, ToolName> = {
@@ -558,6 +687,21 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Delete" || e.key === "Backspace") {
     e.preventDefault();
     editor.deleteSelection();
+  } else if (e.key === "Tab") {
+    // Tab adds a connected child to the selected node (starts a tree).
+    const n = editor.singleSelectedNode();
+    if (n && n.type !== "frame" && n.type !== "ink" && n.type !== "table") {
+      e.preventDefault();
+      addTreeChild(n.id);
+    }
+  } else if (e.key === "Enter") {
+    // Enter adds a sibling when the selected node has a tree parent.
+    const n = editor.singleSelectedNode();
+    const parentEdge = n && treeParentEdgeOf(n.id);
+    if (parentEdge) {
+      e.preventDefault();
+      addTreeChild(parentEdge.from.node);
+    }
   } else if (e.key === "Escape") {
     editor.clearSelection();
     editor.tool = "select";
@@ -1432,6 +1576,13 @@ function frame(): void {
         editor.tool === "select" || editor.tool === "connector"
           ? editor.hoveredId ?? editor.singleSelectedNode()?.id ?? null
           : null,
+      treePlusFor: (() => {
+        if (readOnly || editor.tool !== "select") return null;
+        const n = editor.singleSelectedNode();
+        return n && n.type !== "frame" && n.type !== "ink" && editor.isTreeMember(n.id)
+          ? n.id
+          : null;
+      })(),
       comments: comments.visible(),
       activeCommentId: comments.activeId,
       votes: voteTotalsCached(),

@@ -46,6 +46,8 @@ export interface Scene {
   timestamp?: number;
   /** Node whose connector ports should be shown (hover affordance). */
   portsFor: NodeId | null;
+  /** Selected tree node that shows the add-child "+" below it. */
+  treePlusFor: NodeId | null;
   /** Unresolved comments to draw as pins. */
   comments: BoardComment[];
   /** Vote totals per node; drawn as badges when present. */
@@ -350,6 +352,28 @@ export class Renderer {
           ctx.strokeStyle = SELECTION_COLOR;
           ctx.stroke();
         }
+      }
+    }
+
+    // Add-child "+" under a selected tree node.
+    if (scene.treePlusFor) {
+      const n = scene.getNode(scene.treePlusFor);
+      if (n) {
+        const cx = n.x + n.w / 2;
+        const cy = n.y + n.h + 26 / z;
+        const r = 9 / z;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = SELECTION_COLOR;
+        ctx.fill();
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 1.6 / z;
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.45, cy);
+        ctx.lineTo(cx + r * 0.45, cy);
+        ctx.moveTo(cx, cy - r * 0.45);
+        ctx.lineTo(cx, cy + r * 0.45);
+        ctx.stroke();
       }
     }
 
