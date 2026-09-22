@@ -110,9 +110,16 @@
       user-select: all;
     }
     .cmd .dim { color: #8b93a3; }
+    .demo { margin: 44px auto 0; max-width: 860px; }
+    .demo img {
+      width: 100%; height: auto; display: block;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 6px rgba(15, 18, 25, 0.06), 0 24px 60px rgba(15, 18, 25, 0.14);
+    }
     .badges {
       display: flex; gap: 8px 18px; justify-content: center; flex-wrap: wrap;
-      margin-top: 34px;
+      margin-top: 30px;
       font-size: 13px; color: var(--muted);
     }
     .badges span::before { content: "✓ "; color: var(--accent); font-weight: 600; }
@@ -316,6 +323,9 @@
     <div class="cta">
       <a class="btn primary" href="https://github.com/doideaco/orim">View on GitHub</a>
       <span class="cmd"><span class="dim">$</span> docker compose up -d</span>
+    </div>
+    <div class="demo">
+      <img src="hero.gif" alt="Dropping team.csv on the canvas builds an org chart; Tab adds a report and the tree rebalances" width="960" height="600" loading="lazy" />
     </div>
     <div class="badges">
       <span>One container, one SQLite file</span>
