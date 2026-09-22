@@ -7,6 +7,7 @@ import { PALETTE, CANVAS_BG } from "@orim/renderer";
 import { TEMPLATES } from "@orim/convert";
 import type { PaletteColor } from "@orim/schema";
 import { API, authHeaders, authName, openAuthDialog, signOut } from "./auth";
+import { confirmDialog, noticeDialog, promptDialog } from "./dialogs";
 
 interface BoardInfo {
   name: string;
@@ -130,8 +131,10 @@ export async function renderStartPage(): Promise<void> {
   document.body.replaceChildren(root);
 
   root.querySelector("#new-board")!.addEventListener("click", () => {
-    const name = prompt("Board name");
-    if (name !== null) openBoard(slugify(name));
+    void promptDialog({ title: "New board", placeholder: "Board name", confirm: "Create" })
+      .then((name) => {
+        if (name?.trim()) openBoard(slugify(name));
+      });
   });
 
   const accountBtn = root.querySelector<HTMLButtonElement>("#account-btn")!;
@@ -175,8 +178,14 @@ export async function renderStartPage(): Promise<void> {
     meta.append(title, desc);
     card.append(preview, meta);
     card.addEventListener("click", () => {
-      const name = prompt(`Board name for "${t.name}"`, t.id);
-      if (name !== null) openBoard(slugify(name), t.id);
+      void promptDialog({
+        title: `New ${t.name} board`,
+        placeholder: "Board name",
+        value: t.id,
+        confirm: "Create",
+      }).then((name) => {
+        if (name?.trim()) openBoard(slugify(name), t.id);
+      });
     });
     templateRow.appendChild(card);
   }
@@ -224,25 +233,25 @@ export async function renderStartPage(): Promise<void> {
     renameBtn.textContent = "Rename";
     renameBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const to = prompt("Rename board", info.name);
+      const to = await promptDialog({ title: "Rename board", value: info.name, confirm: "Rename" });
       if (!to || slugify(to) === info.name) return;
       const r = await fetch(
         `${API}/boards/rename?from=${encodeURIComponent(info.name)}&to=${encodeURIComponent(slugify(to))}`,
         { method: "POST", headers: authHeaders() },
       );
-      if (!r.ok) alert("Only the board's owner can rename it.");
+      if (!r.ok) await noticeDialog("Only the board's owner can rename it.");
       location.reload();
     });
     const deleteBtn = document.createElement("button");
     deleteBtn.textContent = "Delete";
     deleteBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm(`Delete "${info.name}"? This can't be undone.`)) return;
+      if (!(await confirmDialog(`Delete "${info.name}"? This can't be undone.`))) return;
       const r = await fetch(`${API}/boards?name=${encodeURIComponent(info.name)}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
-      if (!r.ok) alert("Only the board's owner can delete it.");
+      if (!r.ok) await noticeDialog("Only the board's owner can delete it.");
       try {
         indexedDB.deleteDatabase(`orim-${info.name}`);
       } catch { /* best effort */ }

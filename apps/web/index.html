@@ -508,7 +508,7 @@
       }
 
       /* --- dialogs (auth, share) --- */
-      #auth-dialog-backdrop, #share-backdrop {
+      #auth-dialog-backdrop, #share-backdrop, .dialog-backdrop {
         position: fixed; inset: 0;
         z-index: 50;
         background: rgba(31, 36, 48, 0.35);
@@ -548,6 +548,9 @@
       .dialog button:hover { background: #f3f3f1; }
       .dialog button.primary {
         background: var(--accent); border-color: var(--accent); color: #fff;
+      }
+      .dialog button.primary.danger {
+        background: #dc2626; border-color: #dc2626;
       }
       .dialog button.link {
         border: none; background: none;
