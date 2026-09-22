@@ -4,7 +4,7 @@
  * the data's shape, laid out with ELK, every object carrying its source
  * row. The magic trick that makes the "canvas as database" thesis land.
  */
-import type { Node } from "@orim/schema";
+import { Node as NodeSchema, type Node } from "@orim/schema";
 import {
   buildFromGrid, buildFromMarkdown, buildFromMermaid, buildFromPlainText,
   detectPaste, inferPlan, parseDelimited, textToGrid, toGrid,
@@ -103,6 +103,10 @@ export function setupFileDrop(deps: DropDeps): void {
       void insertImage(deps, file, origin);
       return;
     }
+    if (/\.json$/i.test(file.name) || file.type === "application/json") {
+      void insertOrimJson(deps, file);
+      return;
+    }
     void (async () => {
       try {
         const grid = await gridFromFile(file);
@@ -176,6 +180,55 @@ async function insertImage(
   deps.store.upsertNode(node);
   deps.editor.selectOnly(node.id);
   deps.onDone(`Added image ${file.name}`);
+}
+
+/**
+ * An Orim board file (our JSON export, or the Miro importer's output)
+ * dropped on the canvas: objects land with fresh ids at their authored
+ * positions — parent links, bindings and connector anchors intact —
+ * via the same machinery as cross-board paste.
+ */
+async function insertOrimJson(deps: DropDeps, file: File): Promise<void> {
+  try {
+    const parsed = JSON.parse(await file.text()) as {
+      nodes?: unknown; connectors?: unknown;
+    };
+    const rawNodes = Array.isArray(parsed.nodes)
+      ? parsed.nodes
+      : Object.values(parsed.nodes ?? {});
+    const rawConnectors = Array.isArray(parsed.connectors)
+      ? parsed.connectors
+      : Object.values(parsed.connectors ?? {});
+    const nodes: Node[] = [];
+    let invalid = 0;
+    for (const raw of rawNodes) {
+      const check = NodeSchema.safeParse(raw);
+      if (check.success) nodes.push(check.data);
+      else invalid++;
+    }
+    if (!nodes.length) {
+      deps.onError(`${file.name} doesn't look like an Orim board (no valid objects).`);
+      return;
+    }
+    if (!deps.editor.loadClipboard(JSON.stringify({ nodes, connectors: rawConnectors }))) {
+      deps.onError(`Couldn't read ${file.name}.`);
+      return;
+    }
+    deps.editor.paste(0);
+    const bounds = boundsOf(nodes);
+    if (bounds) {
+      Object.assign(
+        deps.camera,
+        cameraToFit(bounds, window.innerWidth, window.innerHeight, 96),
+      );
+    }
+    deps.onDone(
+      `${file.name} → ${nodes.length} objects` +
+      (invalid ? ` (${invalid} skipped as invalid)` : ""),
+    );
+  } catch (err) {
+    deps.onError(`Import of ${file.name} failed: ${err instanceof Error ? err.message : err}`);
+  }
 }
 
 /** A single pasted/dropped http(s) URL becomes a live embed node. */

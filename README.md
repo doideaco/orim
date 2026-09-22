@@ -77,6 +77,11 @@ decision.
   inference, plain text becomes stickies
 - Generated objects carry their source rows in `data` — the diagram is still
   a database
+- **Migrating from Miro?** `packages/convert/scripts/import-miro.mjs` pulls a
+  board through Miro's REST API and writes an Orim file you drop onto any
+  board — stickies, shapes, text, frames, cards, embeds and connectors map
+  across, and anything unmappable is reported, not silently dropped. Orim
+  JSON exports also drop back in whole.
 
 **The format is the spec**
 - The board format is openly documented at [`docs/`](docs/index.html) — served

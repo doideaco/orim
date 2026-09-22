@@ -20,3 +20,4 @@ export function boardToJSON(board: ExportBoard, id = "board"): BoardDoc {
     comments: Object.fromEntries((board.comments ?? []).map((c) => [c.id, c])),
   };
 }
+export * from "./import-miro";

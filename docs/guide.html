@@ -345,7 +345,25 @@
     <li><b>Plain text</b> becomes stickies, one per line.</li>
     <li>A <b>URL</b> becomes a live embed; an <b>image</b> becomes an image
       node (see below).</li>
+    <li>An <b>Orim board file</b> (a JSON export, or the Miro importer's
+      output) drops back in whole — objects land at their authored
+      positions with fresh ids, frames, bindings and connectors intact.</li>
   </ul>
+  <h3>Migrate from Miro</h3>
+  <ol>
+    <li>Get a Miro access token with <code>boards:read</code> (Miro →
+      profile settings → Your apps).</li>
+    <li>Run the importer against your board id:
+      <pre><code>export MIRO_TOKEN=...
+cd packages/convert
+node --import tsx scripts/import-miro.mjs &lt;miro-board-id&gt;</code></pre></li>
+    <li>Drop the resulting <code>.orim.json</code> onto any Orim board.</li>
+  </ol>
+  <p>Sticky notes, shapes, text, frames (with membership), cards, embeds
+  and connectors map across — colors to the nearest palette, HTML to
+  plain text, positions converted exactly. Images inline when Miro
+  exposes their bytes (placeholders otherwise), and anything unmappable
+  is counted and reported, never silently dropped.</p>
 
   <h2 id="media">Images &amp; live embeds</h2>
   <h3>Images</h3>
