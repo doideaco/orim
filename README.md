@@ -148,10 +148,10 @@ See [DEPLOY.md](DEPLOY.md), [SECURITY.md](SECURITY.md) and
 
 ## Documentation
 
-- **[The Orim guide](docs/guide.html)** — rich how-tos for every feature,
+- **[The Orim guide](https://doideaco.github.io/orim/guide.html)** — rich how-tos for every feature,
   from canvas basics and keyboard authoring to linked tables, workshops,
   history and the admin console
-- **[Format spec](docs/index.html)** — the board format, with its
+- **[Format spec](https://doideaco.github.io/orim/)** — the board format, with its
   [JSON Schema](docs/orim.schema.json)
 - [DEPLOY.md](DEPLOY.md) · [SECURITY.md](SECURITY.md) ·
   [ACCESSIBILITY.md](ACCESSIBILITY.md) · [LICENSING.md](LICENSING.md)
