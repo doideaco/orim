@@ -24,6 +24,8 @@ services:
       # ORIM_TRUST_PROXY: "1"
       # Allow other origins to call the API (default: same-origin only):
       # ORIM_CORS_ORIGINS: https://tools.internal.example
+      # Hosts linked tables may pull CSV from (default: none — air-gapped):
+      # ORIM_FETCH_ALLOW: docs.google.com,data.internal.example
       {}
     restart: unless-stopped
 

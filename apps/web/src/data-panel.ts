@@ -8,6 +8,8 @@ import {
   cellSource, type Connector, type FrameNode, type Node, type StickyNode,
 } from "@orim/schema";
 import { findEmptySpace, synthesizeTable } from "@orim/layout";
+import { feedOf, linkTableFeed, refreshTableFeed, unlinkTableFeed } from "./table-feed";
+import { noticeDialog, promptDialog } from "./dialogs";
 import { orderBoard, nodeLabel, type ExportBoard } from "@orim/convert";
 import { PALETTE } from "@orim/renderer";
 import type { BoardStore } from "@orim/store";
@@ -266,6 +268,39 @@ export class DataPanel {
       actions.appendChild(b);
     };
     const rid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+    // Linked source: the table mirrors a CSV URL, refresh pulls new rows.
+    const feed = feedOf(table);
+    const refresh = async () => {
+      try {
+        const summary = await refreshTableFeed(this.store, table.id);
+        this.onChange();
+        this.scheduleRefresh();
+        void noticeDialog(`Refreshed — ${summary}.`);
+      } catch (err) {
+        void noticeDialog(err instanceof Error ? err.message : String(err));
+      }
+    };
+    if (!feed) {
+      btn("Link to URL…", () => {
+        void promptDialog({
+          title: "Link this table to a CSV source",
+          placeholder: "https://… (published sheet or CSV endpoint)",
+          confirm: "Link",
+        }).then((url) => {
+          if (!url?.trim()) return;
+          linkTableFeed(this.store, table.id, url.trim());
+          void refresh();
+        });
+      });
+    } else {
+      let host = "source";
+      try {
+        host = new URL(feed.url).hostname;
+      } catch { /* keep generic */ }
+      btn(`Refresh from ${host}`, () => void refresh());
+      btn("Unlink source", () => unlinkTableFeed(this.store, table.id));
+    }
 
     btn("+ Row", () => {
       const live = this.store.getNode(table.id);

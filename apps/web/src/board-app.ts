@@ -17,6 +17,7 @@ import {
 } from "@orim/convert";
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
 import { confirmDialog, promptDialog } from "./dialogs";
+import { feedOf, refreshTableFeed } from "./table-feed";
 import { EmbedLayer } from "./embed-layer";
 import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
@@ -370,7 +371,10 @@ const provider = new HocuspocusProvider({
     $("stat-conn").textContent = status === "connected" ? "synced" : status;
     $("status-dot").classList.toggle("connected", status === "connected");
   },
-  onSynced: () => maybeSeedTemplate(),
+  onSynced: () => {
+    maybeSeedTemplate();
+    refreshStaleFeeds();
+  },
 });
 
 // Remember this board locally, so the start page works offline.
@@ -766,6 +770,25 @@ function ensureOnScreen(n: { x: number; y: number; w: number; h: number }): void
   }
   if (sy + sh > window.innerHeight - M) {
     camera.y += (sy + sh - (window.innerHeight - M)) / camera.zoom;
+  }
+}
+
+// --- linked tables: refresh stale sources on open ----------------------------
+
+const FEED_STALE_MS = 5 * 60_000;
+function refreshStaleFeeds(): void {
+  if (readOnly) return;
+  for (const n of store.nodes.values()) {
+    if (n.type !== "table") continue;
+    const feed = feedOf(n);
+    if (!feed || Date.now() - (feed.refreshedAt ?? 0) < FEED_STALE_MS) continue;
+    refreshTableFeed(store, n.id)
+      .then(() => {
+        reconcileDerived();
+        dirty = true;
+        dataPanel.scheduleRefresh();
+      })
+      .catch(() => { /* source offline or fetching disabled — keep last data */ });
   }
 }
 

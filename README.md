@@ -51,6 +51,10 @@ decision.
   every sticky bound to its row
 - Every object carries a free-form `data` bag, editable in the Data panel —
   a sticky on a blueprint can carry an SLA
+- **Linked tables**: point a table at any CSV URL — a published Google
+  Sheet, an internal BI export — behind a server-side allow-list
+  (`ORIM_FETCH_ALLOW`, off by default). Refreshes diff by key so bound
+  stickies and aggregates survive; the source is one-directional truth
 
 **Smart fields**
 - Put a number on a sticky (`estimate: 5`, `cost: 1200`) and it renders as

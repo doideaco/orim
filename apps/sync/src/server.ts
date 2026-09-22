@@ -139,6 +139,17 @@ function rateLimited(request: IncomingMessage): boolean {
 const RATE_LIMITED_PATHS = new Set([
   "/auth/login", "/auth/signup", "/auth/oidc/login", "/auth/oidc/callback",
 ]);
+
+/**
+ * Linked-table data sources. Off by default — the server makes no
+ * outbound calls unless the operator explicitly allow-lists hosts
+ * (e.g. ORIM_FETCH_ALLOW=docs.google.com,data.internal.example).
+ */
+const FETCH_ALLOW = (process.env.ORIM_FETCH_ALLOW ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+const FETCH_MAX_BYTES = 2_000_000;
 const selectStmt = db.prepare("SELECT state FROM boards WHERE name = ?");
 const upsertStmt = db.prepare(`
   INSERT INTO boards (name, state, updated_at) VALUES (?, ?, ?)
@@ -348,7 +359,8 @@ const server = new Server({
       url.pathname.startsWith("/boards") ||
       url.pathname.startsWith("/auth") ||
       url.pathname.startsWith("/audit") ||
-      url.pathname.startsWith("/admin/");
+      url.pathname.startsWith("/admin/") ||
+      url.pathname === "/fetch";
     if (!api) {
       // Single-container mode: serve the built web app.
       if (webDist && request.method === "GET" && serveStatic(webDist, url.pathname, response)) {
@@ -539,6 +551,50 @@ const server = new Server({
           db.prepare("DELETE FROM users WHERE id = ?").run(t.id);
           audit(user.name, "admin.user.delete", null, t.name);
           return send(200, { ok: true });
+        }
+      }
+
+      // --- linked-table data sources (allow-listed proxy) ---
+      if (request.method === "GET" && url.pathname === "/fetch") {
+        if (!FETCH_ALLOW.length) {
+          return send(403, {
+            error: "Data sources are disabled — set ORIM_FETCH_ALLOW on the server.",
+          });
+        }
+        const target = url.searchParams.get("url");
+        if (!target) return send(400, { error: "url required" });
+        let parsed: URL;
+        try {
+          parsed = new URL(target);
+        } catch {
+          return send(400, { error: "invalid url" });
+        }
+        const allowed = (host: string) => FETCH_ALLOW.includes(host.toLowerCase());
+        if (!/^https?:$/.test(parsed.protocol) || !allowed(parsed.hostname)) {
+          return send(403, { error: `${parsed.hostname} is not in ORIM_FETCH_ALLOW.` });
+        }
+        try {
+          const res = await fetch(parsed, {
+            signal: AbortSignal.timeout(10_000),
+            redirect: "follow",
+            headers: { accept: "text/csv, text/plain, */*" },
+          });
+          // A redirect must not escape the allow-list.
+          if (!allowed(new URL(res.url).hostname)) {
+            return send(403, { error: "The source redirected outside the allow-list." });
+          }
+          if (!res.ok) return send(502, { error: `Source answered ${res.status}.` });
+          const length = Number(res.headers.get("content-length") ?? 0);
+          if (length > FETCH_MAX_BYTES) return send(413, { error: "Source too large (2 MB cap)." });
+          const text = await res.text();
+          if (text.length > FETCH_MAX_BYTES) return send(413, { error: "Source too large (2 MB cap)." });
+          audit(user?.name ?? "guest", "data.fetch", null, parsed.hostname);
+          return send(200, { text });
+        } catch (err) {
+          if (err === undefined) throw err;
+          return send(502, {
+            error: `Couldn't reach the source: ${err instanceof Error ? err.message : err}`,
+          });
         }
       }
 

@@ -18,7 +18,9 @@ browser ── HTTPS/WSS (your reverse proxy) ──► orim server
 
 **Nothing leaves the box.** The server makes no outbound network calls
 except, when OIDC is configured, to your identity provider (discovery,
-token exchange, JWKS). There is no telemetry, no update phone-home, no
+token exchange, JWKS) — and, only if you explicitly allow-list hosts in
+`ORIM_FETCH_ALLOW`, to those hosts for linked-table refreshes (off by
+default, redirect-checked, size-capped, every fetch audited). There is no telemetry, no update phone-home, no
 CDN: fonts are system fonts, all JavaScript is bundled and served
 locally. The application works in fully air-gapped environments.
 
