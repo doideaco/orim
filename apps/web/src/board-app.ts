@@ -783,7 +783,7 @@ const MENU_ICONS: [string, IconNode][] = [
   ["btn-data", Database],
 ];
 for (const [id, icon] of MENU_ICONS) {
-  $(id).prepend(createElement(icon, { width: 15, height: 15, "stroke-width": 1.75 }));
+  $(id).prepend(createElement(icon, { width: 17, height: 17, "stroke-width": 1.75 }));
 }
 function setMenuOpen(open: boolean): void {
   menuDropdown.hidden = !open;
@@ -1849,7 +1849,7 @@ renderDrafts();
 
 const exportBtn = $("btn-export");
 const exportMenu = $("export-menu");
-exportBtn.prepend(createElement(Download, { width: 15, height: 15, "stroke-width": 1.75 }));
+exportBtn.prepend(createElement(Download, { width: 17, height: 17, "stroke-width": 1.75 }));
 
 function exportBoard(): ExportBoard {
   return {
