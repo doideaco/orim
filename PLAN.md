@@ -148,13 +148,31 @@ importer (high leverage, do early in post-launch), plugin/widget SDK, org SSO/SC
 
 ---
 
-## 5. Business model (sketch)
+## 5. Business model — REVISED 2026-09-22
 
-- **Free:** unlimited boards local-first, 3 hosted multiplayer boards, unlimited viewers.
-- **Pro (~$10/editor/mo):** unlimited hosted boards, version history, exports at scale.
-- **Team (~$16/editor/mo):** SSO, permissions, admin, audit.
-- **Self-host:** free for the core; paid enterprise support/license.
-- Never charge for: viewing, commenting, exporting your own data. That's the brand.
+**Orim is a self-hosted product for regulated industries** — government
+departments, financial institutions, healthcare, defense, legal — the buyers
+who cannot use Miro/Mural/FigJam (none of which offer self-hosting at any
+price) and currently ban visual collaboration or suffer through cloud
+security reviews.
+
+Why the architecture already fits: local-first, one small sync server, SQLite
+in a single file (backup = copy a file), zero external calls (air-gap ready),
+an open audited format, MCP against *their* on-prem LLMs, and an
+accessibility tree that backs a VPAT — Section 508/EN 301 549 is a legal
+procurement gate that incumbents fail.
+
+- **Model:** GitLab/Mattermost playbook — per-server annual license by seat
+  band + support SLAs; docker-compose self-serve trial feeding sales-led
+  deals. Indicative: £10–20k/yr per 100 seats; gov/enterprise £25–100k.
+- **Licensing:** format, JSON Schema and converters stay MIT (interop trust);
+  app source-available (FSL-style); enterprise tier gates SSO, audit log,
+  admin console.
+- **Deprioritized:** SaaS billing, hosted multi-tenancy, freemium.
+- **New roadmap rocks:** single-container deploy (sync server serves the web
+  build; one process, one port, one file), append-only audit log, OIDC SSO +
+  session hardening, security whitepaper + VPAT.
+- Still never gated: viewing, commenting, exporting your own data.
 
 ## 6. Risks
 
