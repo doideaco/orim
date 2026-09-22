@@ -865,6 +865,63 @@
       #status-dot.connected { background: #22c55e; }
       #stat-fps { font-variant-numeric: tabular-nums; }
 
+      /* --- history panel --- */
+      body.history-viewing #toolbar { opacity: 0.35; pointer-events: none; }
+      #historypanel {
+        position: fixed;
+        right: 12px; top: 56px; bottom: 12px;
+        width: 304px;
+        z-index: 9;
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        overflow: hidden;
+        padding: 14px;
+      }
+      #historypanel.open { display: flex; }
+      #historypanel h2 { margin: 0; font-size: 13px; font-weight: 600; }
+      #history-banner {
+        background: #eef3ff;
+        border: 1px solid #dbe6ff;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 12.5px;
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      #history-banner[hidden] { display: none; }
+      .history-banner-actions { display: flex; gap: 6px; }
+      .history-banner-actions button, #history-save {
+        font: inherit; font-size: 12px;
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 8px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      .history-banner-actions button.primary {
+        background: var(--accent); color: #fff; border-color: var(--accent);
+      }
+      #history-list {
+        flex: 1;
+        overflow-y: auto;
+        display: flex; flex-direction: column; gap: 4px;
+      }
+      .history-row {
+        font: inherit; font-size: 12.5px;
+        text-align: left;
+        border: 1px solid transparent;
+        background: transparent;
+        border-radius: 9px;
+        padding: 8px 10px;
+        cursor: pointer;
+        display: flex; flex-direction: column; gap: 1px;
+      }
+      .history-row:hover { background: #f3f3f1; }
+      .history-row.viewing { border-color: var(--accent); background: #eef3ff; }
+      .history-row b { font-weight: 600; }
+      .history-row span { font-size: 11px; color: #9ca3af; }
+      #historypanel .hint { color: #9ca3af; font-size: 12.5px; }
+
       /* --- present mode --- */
       body.presenting #toolbar,
       body.presenting #exportbar,
@@ -977,6 +1034,7 @@
       <button id="btn-timer" title="Shared timer">Timer</button>
       <button id="btn-drafts" title="Private drafts — write ideas, reveal together">Drafts</button>
       <button id="btn-vote" title="Dot voting">Vote</button>
+      <button id="btn-history" title="Board history — view and restore versions">History</button>
       <button id="btn-share" title="Share this board">Share</button>
       <button id="btn-data" title="Board data — \">Data</button>
       <button id="btn-export" title="Export the board">Export</button>
@@ -1003,6 +1061,19 @@
     </div>
 
     <div id="minimap" class="panel"><canvas id="minimap-canvas" width="200" height="140"></canvas></div>
+
+    <div id="historypanel" class="panel">
+      <h2>History</h2>
+      <div id="history-banner" hidden>
+        <div>Viewing <b id="history-when"></b> — read-only</div>
+        <div class="history-banner-actions">
+          <button id="history-restore" class="primary">Restore this version</button>
+          <button id="history-back">Back to now</button>
+        </div>
+      </div>
+      <button id="history-save">Save labelled version…</button>
+      <div id="history-list"><div class="hint">Loading…</div></div>
+    </div>
 
     <div id="present-hud" class="panel" hidden>
       <button id="present-prev" title="Previous frame (←)">←</button>

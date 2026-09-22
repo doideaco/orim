@@ -16,6 +16,7 @@ import {
   type ExportBoard,
 } from "@orim/convert";
 import { TextEditorOverlay, isEditable } from "./editor-overlay";
+import { confirmDialog, promptDialog } from "./dialogs";
 import { EmbedLayer } from "./embed-layer";
 import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
@@ -279,7 +280,7 @@ function toast(message: string, isError = false): void {
 
 const importDeps = {
   store, editor, camera, newId,
-  canEdit: () => !readOnly,
+  canEdit: () => !readOnly && !historyStore,
   onDone: (summary: string) => {
     toast(summary);
     dirty = true;
@@ -537,6 +538,7 @@ canvas.addEventListener("pointerup", (e) => {
 });
 
 canvas.addEventListener("dblclick", (e) => {
+  if (historyStore) return; // time-travel view is look, don't touch
   // Double-clicking an embed hands it the pointer (scroll, click links);
   // Escape or clicking the canvas gives it back. Works for viewers too.
   const hit = editor.hitNode(info(e).world);
@@ -738,6 +740,140 @@ function ensureOnScreen(n: { x: number; y: number; w: number; h: number }): void
   }
 }
 
+// --- board history (server-side snapshots; restore = ordinary edits) ---------
+
+interface HistoryRow { id: number; at: number; label: string | null; size: number }
+
+let historyStore: BoardStore | null = null;
+let historyAt: number | null = null;
+let historyViewingId: number | null = null;
+let toolBeforeHistory: ToolName = "select";
+
+const historyPanel = $("historypanel");
+const fmtWhen = (at: number): string =>
+  new Date(at).toLocaleString(undefined, {
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  });
+
+async function refreshHistoryList(): Promise<void> {
+  const list = $("history-list");
+  try {
+    const rows = await api<HistoryRow[]>(
+      "GET", `/boards/history?board=${encodeURIComponent(bareBoard)}`,
+    );
+    list.replaceChildren();
+    if (!rows.length) {
+      list.innerHTML = `<div class="hint">No versions yet — snapshots are saved automatically as the board changes.</div>`;
+      return;
+    }
+    for (const row of rows) {
+      const btn = document.createElement("button");
+      btn.className = "history-row";
+      if (row.id === historyViewingId) btn.classList.add("viewing");
+      const title = document.createElement("b");
+      title.textContent = row.label ?? "Auto snapshot";
+      const sub = document.createElement("span");
+      sub.textContent = fmtWhen(row.at);
+      btn.append(title, sub);
+      btn.addEventListener("click", () => void viewVersion(row));
+      list.appendChild(btn);
+    }
+  } catch (err) {
+    list.innerHTML = `<div class="hint"></div>`;
+    list.querySelector(".hint")!.textContent =
+      `History unavailable: ${err instanceof Error ? err.message : err}`;
+  }
+}
+
+async function viewVersion(row: HistoryRow): Promise<void> {
+  const { state } = await api<{ state: string }>(
+    "GET", `/boards/history/state?id=${row.id}`,
+  );
+  const doc = new Y.Doc();
+  if (!historyStore) toolBeforeHistory = editor.tool;
+  // Store first, then update: caches fill from the observer events.
+  historyStore = new BoardStore(doc);
+  Y.applyUpdate(doc, Uint8Array.from(atob(state), (c) => c.charCodeAt(0)));
+  historyAt = row.at;
+  historyViewingId = row.id;
+  editor.clearSelection();
+  editor.tool = "hand";
+  embeds.activate(null);
+  overlay.close();
+  document.body.classList.add("history-viewing");
+  $("history-banner").hidden = false;
+  $("history-when").textContent = fmtWhen(row.at);
+  ($("history-restore") as HTMLButtonElement).disabled = readOnly;
+  a11y.announce(`Viewing board version from ${fmtWhen(row.at)} — read only`);
+  void refreshHistoryList();
+  dirty = true;
+}
+
+function exitHistory(): void {
+  if (!historyStore) return;
+  historyStore = null;
+  historyAt = null;
+  historyViewingId = null;
+  document.body.classList.remove("history-viewing");
+  $("history-banner").hidden = true;
+  editor.tool = toolBeforeHistory;
+  void refreshHistoryList();
+  dirty = true;
+}
+
+async function restoreVersion(): Promise<void> {
+  if (!historyStore || readOnly) return;
+  const old = historyStore;
+  const when = historyAt ? fmtWhen(historyAt) : "this version";
+  if (!(await confirmDialog(
+    `Restore the board to ${when}? Current content is replaced — you can undo.`,
+    "Restore",
+  ))) return;
+  store.transact(() => {
+    for (const n of old.nodes.values()) store.upsertNode(n);
+    for (const c of old.connectors.values()) store.upsertConnector(c);
+    for (const cm of old.comments.values()) store.upsertComment(cm);
+    for (const id of [...store.nodes.keys()]) {
+      if (!old.nodes.has(id)) store.deleteNode(id);
+    }
+    for (const id of [...store.connectors.keys()]) {
+      if (!old.connectors.has(id)) store.deleteConnector(id);
+    }
+    for (const id of [...store.comments.keys()]) {
+      if (!old.comments.has(id)) store.deleteComment(id);
+    }
+  });
+  void api("POST", "/boards/restored", { board: bareBoard, at: historyAt })
+    .catch(() => { /* audit is best effort for offline boards */ });
+  exitHistory();
+  toast(`Restored the version from ${when} — ⌘Z undoes it`);
+  a11y.scheduleRebuild();
+}
+
+$("btn-history").addEventListener("click", () => {
+  const open = historyPanel.classList.toggle("open");
+  if (open) void refreshHistoryList();
+  else exitHistory();
+});
+$("history-back").addEventListener("click", exitHistory);
+$("history-restore").addEventListener("click", () => void restoreVersion());
+$("history-save").addEventListener("click", () => {
+  void promptDialog({
+    title: "Save a labelled version",
+    placeholder: "Label (e.g. pre-workshop baseline)",
+    confirm: "Save",
+  }).then(async (label) => {
+    if (label === null) return;
+    try {
+      await api("POST", "/boards/snapshot", { board: bareBoard, label });
+      toast("Version saved");
+      void refreshHistoryList();
+    } catch (err) {
+      toast(`Couldn't save: ${err instanceof Error ? err.message : err}`, true);
+    }
+  });
+});
+
 // --- present mode (each frame is a slide, in reading order) ------------------
 
 let presenting = false;
@@ -834,6 +970,15 @@ window.addEventListener("keydown", (e) => {
   if (t.closest?.("#a11y-mirror")) return; // the mirror owns its own arrows
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key.toLowerCase();
+
+  // History view is read-only: pan/zoom only, Escape returns to now.
+  if (historyStore) {
+    if (e.key === "Escape") exitHistory();
+    else if (key === "1") zoomToFit();
+    else if (key === "0") camera.zoom = 1;
+    dirty = true;
+    return;
+  }
 
   // Present mode owns navigation keys (viewers can present too).
   if (presenting) {
@@ -1752,18 +1897,21 @@ let fpsWindowStart = performance.now();
 let lastMinimap = 0;
 
 function frame(): void {
-  const dataLinks = computeDataLinks();
+  // While time-travelling, the scene renders the historical store;
+  // live-only affordances (presence, comments, votes, links) hide.
+  const src = historyStore ?? store;
+  const dataLinks = historyStore ? [] : computeDataLinks();
   if (dirty || presences.length > 0 || overlay.activeId || dataLinks.length) {
     renderer.render({
-      nodesSorted: store.nodesSorted,
-      connectors: store.connectors,
-      getNode: (id) => store.getNode(id),
+      nodesSorted: src.nodesSorted,
+      connectors: src.connectors,
+      getNode: (id) => src.getNode(id),
       camera,
       selection: editor.selection,
       connectorSelection: editor.connectorSelection,
       editingId: overlay.activeId,
-      presences,
-      revision: store.revision,
+      presences: historyStore ? [] : presences,
+      revision: src.revision,
       dataLinks,
       timestamp: performance.now(),
       portsFor:
@@ -1778,9 +1926,9 @@ function frame(): void {
           ? n.id
           : null;
       })(),
-      comments: comments.visible(),
+      comments: historyStore ? [] : comments.visible(),
       activeCommentId: comments.activeId,
-      votes: voteTotalsCached(),
+      votes: historyStore ? null : voteTotalsCached(),
       marquee: editor.marquee,
       draftRect: editor.draftRect,
       draftConnector: editor.draftConnector,
@@ -1788,7 +1936,7 @@ function frame(): void {
       draftColor: PALETTE[defaultColor].solid,
     });
     overlay.reposition(camera);
-    embeds.sync(store.nodesSorted, camera);
+    embeds.sync(src.nodesSorted, camera);
     comments.reposition();
     dirty = false;
   }
@@ -1797,7 +1945,7 @@ function frame(): void {
   if (now - lastMinimap > 250) {
     minimapTransform = renderer.renderMinimap(
       minimapCanvas,
-      { nodesSorted: store.nodesSorted, camera },
+      { nodesSorted: src.nodesSorted, camera },
       editor.contentBounds(),
     );
     lastMinimap = now;

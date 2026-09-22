@@ -35,6 +35,8 @@ ORIM_WEB_DIST=$PWD/apps/web/dist ORIM_DATA_DIR=/var/lib/orim \
 | `ORIM_SESSION_TTL_HOURS` | `720` | Session lifetime |
 | `ORIM_CORS_ORIGINS` | same-origin¹ | CORS allow-list: `*` or comma-separated origins |
 | `ORIM_AUTH_RATE_LIMIT` | `30` | Max auth attempts per IP per 10 minutes |
+| `ORIM_HISTORY_INTERVAL_MIN` | `10` | Minutes between automatic board version snapshots |
+| `ORIM_HISTORY_KEEP` | `200` | Automatic snapshots kept per board (labelled ones always kept) |
 | `ORIM_TRUST_PROXY` | – | `1` reads client IP from `X-Forwarded-For` (set behind a proxy) |
 | `ORIM_OIDC_ISSUER` | – | OIDC issuer URL (enables SSO) |
 | `ORIM_OIDC_CLIENT_ID` | – | OIDC client id |

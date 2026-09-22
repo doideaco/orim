@@ -73,6 +73,16 @@ with timestamps. Admins can browse and filter it in the admin console at
 `GET /audit` (bearer auth), or ingest it into a SIEM directly from
 SQLite.
 
+## Board history
+
+The server keeps append-only version snapshots of every board:
+automatic ones on a throttle (`ORIM_HISTORY_INTERVAL_MIN`, default 10
+minutes, pruned to `ORIM_HISTORY_KEEP`), and labelled ones saved by
+editors, which are never pruned. Versions can be viewed read-only and
+restored; a restore is applied as ordinary synced edits — the server
+never rewrites a live document — and is recorded in the audit log with
+who restored and to when.
+
 ## Deployment hardening checklist
 
 - Terminate TLS at your reverse proxy; set `ORIM_PUBLIC_URL` to the

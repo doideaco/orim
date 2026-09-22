@@ -131,8 +131,9 @@ Orim is built for teams that can't put their thinking in someone else's
 cloud — government, finance, healthcare, defense. **One container, one
 port, one SQLite file**; zero external calls, air-gap ready; OIDC SSO
 against your IdP; an append-only audit log with an admin console
-(`/admin`) for users, roles, sessions and audit browsing; and an open,
-audited format.
+(`/admin`) for users, roles, sessions and audit browsing; append-only
+board history with read-only time-travel and audited, undoable restores;
+and an open, audited format.
 
 ```bash
 docker compose up -d        # → http://localhost:1234

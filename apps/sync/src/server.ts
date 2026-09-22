@@ -62,6 +62,14 @@ db.exec(`
     state TEXT PRIMARY KEY,
     created_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS board_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    label TEXT,
+    state BLOB NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS board_history_board ON board_history (board, at);
 `);
 try {
   db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
@@ -136,6 +144,37 @@ const upsertStmt = db.prepare(`
   INSERT INTO boards (name, state, updated_at) VALUES (?, ?, ?)
   ON CONFLICT(name) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at
 `);
+
+/**
+ * Board history: append-only version snapshots. Automatic snapshots are
+ * throttled per board; manual ones carry a label and are never pruned.
+ * Restores happen client-side as ordinary CRDT edits (so they sync and
+ * are undoable) — the server never rewrites the live document.
+ */
+const HISTORY_INTERVAL =
+  Number(process.env.ORIM_HISTORY_INTERVAL_MIN ?? 10) * 60_000;
+const HISTORY_KEEP = Number(process.env.ORIM_HISTORY_KEEP ?? 200);
+const lastAutoSnap = new Map<string, number>();
+const insertSnap = db.prepare(
+  "INSERT INTO board_history (board, at, label, state) VALUES (?, ?, ?, ?)",
+);
+function autoSnapshot(board: string, state: Uint8Array): void {
+  const last =
+    lastAutoSnap.get(board) ??
+    ((db.prepare("SELECT MAX(at) AS at FROM board_history WHERE board = ?")
+      .get(board) as { at: number | null }).at ?? 0);
+  if (Date.now() - last < HISTORY_INTERVAL) {
+    if (!lastAutoSnap.has(board)) lastAutoSnap.set(board, last);
+    return;
+  }
+  insertSnap.run(board, Date.now(), null, state);
+  lastAutoSnap.set(board, Date.now());
+  db.prepare(
+    `DELETE FROM board_history WHERE board = ? AND label IS NULL AND id NOT IN (
+       SELECT id FROM board_history WHERE board = ? AND label IS NULL
+       ORDER BY at DESC LIMIT ?)`,
+  ).run(board, board, HISTORY_KEEP);
+}
 
 // --- auth --------------------------------------------------------------------
 
@@ -515,6 +554,65 @@ const server = new Server({
           ...previewOf(new Uint8Array(r.state)),
         })));
       }
+      // --- board history (append-only; anyone with board access can read) ---
+      if (request.method === "GET" && url.pathname === "/boards/history") {
+        const board = url.searchParams.get("board");
+        if (!board) return send(400, { error: "board required" });
+        if (accessFor(docName(board), user).role === "none") {
+          return send(403, { error: "no access" });
+        }
+        const rows = db
+          .prepare(
+            `SELECT id, at, label, length(state) AS size FROM board_history
+             WHERE board = ? ORDER BY at DESC LIMIT 500`,
+          )
+          .all(docName(board));
+        return send(200, rows);
+      }
+      if (request.method === "GET" && url.pathname === "/boards/history/state") {
+        const id = Number(url.searchParams.get("id"));
+        const row = db
+          .prepare("SELECT board, state FROM board_history WHERE id = ?")
+          .get(id) as { board: string; state: Uint8Array } | undefined;
+        if (!row) return send(404, { error: "no such version" });
+        if (accessFor(row.board, user).role === "none") {
+          return send(403, { error: "no access" });
+        }
+        return send(200, { state: Buffer.from(row.state).toString("base64") });
+      }
+      if (request.method === "POST" && url.pathname === "/boards/snapshot") {
+        const { board, label } = JSON.parse(await readBody(request)) as {
+          board?: string; label?: string;
+        };
+        if (!board) return send(400, { error: "board required" });
+        if (!["owner", "editor"].includes(accessFor(docName(board), user).role)) {
+          return send(403, { error: "editors only" });
+        }
+        const current = selectStmt.get(docName(board)) as { state: Uint8Array } | undefined;
+        if (!current) return send(404, { error: "no such board" });
+        insertSnap.run(
+          docName(board), Date.now(), (label ?? "").trim() || "Saved version", current.state,
+        );
+        audit(user?.name ?? "guest", "board.snapshot", docName(board), label);
+        return send(200, { ok: true });
+      }
+      if (request.method === "POST" && url.pathname === "/boards/restored") {
+        // The restore itself is applied client-side as ordinary edits;
+        // this records who rolled the content back, and to when.
+        const { board, at } = JSON.parse(await readBody(request)) as {
+          board?: string; at?: number;
+        };
+        if (!board) return send(400, { error: "board required" });
+        if (!["owner", "editor"].includes(accessFor(docName(board), user).role)) {
+          return send(403, { error: "editors only" });
+        }
+        audit(
+          user?.name ?? "guest", "board.restore", docName(board),
+          at ? new Date(at).toISOString() : undefined,
+        );
+        return send(200, { ok: true });
+      }
+
       if (request.method === "GET" && url.pathname === "/boards/access") {
         const board = url.searchParams.get("board");
         if (!board) return send(400, { error: "board required" });
@@ -583,6 +681,7 @@ const server = new Server({
         db.prepare("DELETE FROM boards WHERE name = ?").run(docName(name));
         db.prepare("DELETE FROM board_settings WHERE board = ?").run(docName(name));
         db.prepare("DELETE FROM board_roles WHERE board = ?").run(docName(name));
+        db.prepare("DELETE FROM board_history WHERE board = ?").run(docName(name));
         audit(user?.name ?? "guest", "board.delete", docName(name));
         return send(200, { ok: true });
       }
@@ -595,6 +694,7 @@ const server = new Server({
         db.prepare("UPDATE boards SET name = ? WHERE name = ?").run(docName(to), docName(from));
         db.prepare("UPDATE board_settings SET board = ? WHERE board = ?").run(docName(to), docName(from));
         db.prepare("UPDATE board_roles SET board = ? WHERE board = ?").run(docName(to), docName(from));
+        db.prepare("UPDATE board_history SET board = ? WHERE board = ?").run(docName(to), docName(from));
         audit(user?.name ?? "guest", "board.rename", docName(from), `-> ${to}`);
         return send(200, { ok: true });
       }
@@ -613,6 +713,7 @@ const server = new Server({
       },
       store: async ({ documentName, state }) => {
         upsertStmt.run(documentName, state, Date.now());
+        autoSnapshot(documentName, state);
       },
     }),
   ],
