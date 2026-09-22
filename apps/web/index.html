@@ -733,7 +733,9 @@
       #comment-panel .actions button:last-child { margin-left: auto; }
 
       /* --- tooltips --- */
-      [data-tip] { position: relative; }
+      /* Anchor the bubble without knocking fixed panels out of place:
+         only statically-positioned elements need the relative. */
+      [data-tip]:not(.panel) { position: relative; }
       [data-tip]::after {
         content: attr(data-tip);
         position: absolute;
