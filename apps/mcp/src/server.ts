@@ -13,7 +13,7 @@ import { z } from "zod";
 import type { Connector, Endpoint, Node, PaletteColor } from "@orim/schema";
 import { cellSource, type FrameNode, type StickyNode } from "@orim/schema";
 import { boardToJSON, boardToMarkdown, boardToMermaid, boardToSVG } from "@orim/convert";
-import { findEmptySpace, grid, layered, synthesizeTable } from "@orim/layout";
+import { findEmptySpace, grid, layered, synthesizeTable, tree } from "@orim/layout";
 import { docName, openBoard, settle, toExportBoard } from "./boards";
 
 const DB_PATH =
@@ -31,7 +31,7 @@ const color = z
   .optional();
 
 const CreateNode = z.object({
-  type: z.enum(["sticky", "shape", "frame", "text", "table"]),
+  type: z.enum(["sticky", "shape", "frame", "text", "table", "image", "embed"]),
   x: z.number(),
   y: z.number(),
   w: z.number().optional(),
@@ -44,6 +44,11 @@ const CreateNode = z.object({
   columns: z.array(z.string()).optional().describe("Table column names"),
   rows: z.array(z.array(z.string())).optional()
     .describe("Table rows: cell text per column, in column order"),
+  url: z.string().optional()
+    .describe("Embed only: the http(s) page to show live on the board"),
+  src: z.string().optional()
+    .describe("Image only: the image source — a data: URL keeps the board self-contained"),
+  alt: z.string().optional().describe("Image alt text (exports and screen readers)"),
 });
 
 const CreateConnector = z.object({
@@ -59,6 +64,8 @@ const DEFAULT_SIZE: Record<string, { w: number; h: number }> = {
   frame: { w: 480, h: 320 },
   text: { w: 280, h: 28 },
   table: { w: 480, h: 136 },
+  image: { w: 320, h: 240 },
+  embed: { w: 640, h: 400 },
 };
 
 function buildNode(input: z.infer<typeof CreateNode>, index: string): Node {
@@ -88,6 +95,14 @@ function buildNode(input: z.infer<typeof CreateNode>, index: string): Node {
       return { ...base, type: "frame", title: input.title ?? input.text ?? "Frame" };
     case "text":
       return { ...base, type: "text", text: input.text ?? "", fontSize: 16 };
+    case "image":
+      if (!input.src) throw new Error("image nodes need src");
+      return { ...base, type: "image", src: input.src, alt: input.alt ?? "" };
+    case "embed":
+      if (!input.url || !/^https?:\/\//.test(input.url)) {
+        throw new Error("embed nodes need an http(s) url");
+      }
+      return { ...base, type: "embed", url: input.url };
     case "table": {
       const names = input.columns ?? ["Column 1", "Column 2", "Column 3"];
       const columns = names.map((name, i) => ({ id: `c${i}`, name, w: 160 }));
@@ -232,7 +247,7 @@ server.tool(
 
 server.tool(
   "update_objects",
-  "Update fields on existing nodes by id (position, size, text, color, title, parent). Read the board as json first to get ids.",
+  "Update fields on existing nodes by id (position, size, text, color, title, parent, embed url, image alt). Read the board as json first to get ids.",
   {
     board: boardArg,
     updates: z.array(
@@ -246,6 +261,8 @@ server.tool(
         title: z.string().optional(),
         color,
         parent: z.string().nullable().optional(),
+        url: z.string().optional().describe("Embed nodes: change the page shown"),
+        alt: z.string().optional().describe("Image nodes: alt text"),
         data: z.record(z.string(), z.unknown()).optional()
           .describe("Merged into the node's data bag. Numeric fields render as chips and frames aggregate them automatically."),
       }),
@@ -292,11 +309,11 @@ server.tool(
 
 server.tool(
   "apply_layout",
-  "Auto-arrange nodes. 'layered' (ELK) flows connected nodes along their edges — use for flowcharts and dependency graphs. 'grid' packs nodes into tidy rows — use for loose stickies. Defaults to all top-level non-frame nodes; pass node_ids to layout a subset (e.g. one cluster or one frame's children).",
+  "Auto-arrange nodes. 'layered' (ELK) flows connected nodes along their edges — use for flowcharts and dependency graphs. 'tree' is a tidy tree for strict hierarchies — org charts and mind maps get children grouped under parents and every parent centered over its subtree. 'grid' packs nodes into tidy rows — use for loose stickies. Defaults to all top-level non-frame nodes; pass node_ids to layout a subset (e.g. one cluster or one frame's children).",
   {
     board: boardArg,
     node_ids: z.array(z.string()).optional(),
-    algorithm: z.enum(["layered", "grid"]).default("layered"),
+    algorithm: z.enum(["layered", "tree", "grid"]).default("layered"),
     direction: z.enum(["RIGHT", "DOWN", "LEFT", "UP"]).default("RIGHT")
       .describe("Flow direction for layered layout"),
     columns: z.number().int().positive().optional().describe("Column count for grid layout"),
@@ -310,7 +327,9 @@ server.tool(
     const positions =
       algorithm === "grid"
         ? grid(targets, { columns })
-        : await layered(targets, [...store.connectors.values()], { direction });
+        : algorithm === "tree"
+          ? tree(targets, [...store.connectors.values()])
+          : await layered(targets, [...store.connectors.values()], { direction });
     store.transact(() => {
       for (const [id, pos] of positions) store.updateNode(id, pos);
     });

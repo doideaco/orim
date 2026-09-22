@@ -116,8 +116,8 @@ decision.
 **Agent-native (MCP)**
 - A built-in MCP server exposes boards as structured data:
   `list_boards`, `read_board` (markdown/json/mermaid/svg), `create_objects`
-  (with `$n` cross-references), `update_objects`, `delete_objects`,
-  `apply_layout` (ELK layered / grid), `find_empty_space`, `synthesize_table`
+  (with `$n` cross-references — including images and live embeds), `update_objects`, `delete_objects`,
+  `apply_layout` (ELK layered / tidy tree / grid), `find_empty_space`, `synthesize_table`
 - Agent edits ride the same CRDT pipeline as human edits — people watching the
   board see them appear live
 - `create_objects` warns agents when new objects overlap existing content
