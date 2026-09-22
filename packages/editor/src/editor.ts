@@ -543,6 +543,22 @@ export class Editor {
         this.draftConnector = null;
         this.draftBindCell = null;
         const to = this.endpointFor(info.world, drag.fromNode);
+        // Drawing from a bottom port down onto a node reads as a
+        // reporting line: anchor it top-side so the diagram counts as a
+        // tree (Tab/Enter authoring, "+", arrow navigation).
+        if (
+          "node" in drag.from && drag.from.anchor === "s" &&
+          "node" in to && to.anchor === "auto" && !to.row
+        ) {
+          const source = this.store.getNode(drag.from.node);
+          const target = this.store.getNode(to.node);
+          if (
+            source && target && target.type !== "table" &&
+            target.y >= source.y + source.h
+          ) {
+            to.anchor = "n";
+          }
+        }
         // A connector from a point to the same point is a misclick.
         if (
           "point" in drag.from && "point" in to &&

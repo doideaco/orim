@@ -7,7 +7,7 @@
 import {
   cellSource, type Connector, type FrameNode, type Node, type StickyNode,
 } from "@orim/schema";
-import { findEmptySpace, synthesizeTable } from "@orim/layout";
+import { findEmptySpace, synthesizeTable, tree } from "@orim/layout";
 import { feedOf, linkTableFeed, refreshTableFeed, unlinkTableFeed } from "./table-feed";
 import { noticeDialog, promptDialog } from "./dialogs";
 import { orderBoard, nodeLabel, type ExportBoard } from "@orim/convert";
@@ -481,8 +481,92 @@ export class DataPanel {
     this.inspector.appendChild(dl);
 
     if (node.type === "table") this.renderTableActions(node);
+    this.renderTreeConvert(node);
 
     this.renderFieldRows(node);
+  }
+
+  /**
+   * "Treat as tree": convert a hand-drawn hierarchy (plain arrows) into
+   * a real tree — connectors re-anchored bottom → top and the tidy
+   * layout applied — so Tab/Enter authoring and arrow navigation work.
+   * Only offered when the connected component is a strict hierarchy.
+   */
+  private renderTreeConvert(node: Node): void {
+    if (node.type === "frame" || node.type === "ink" || node.type === "table") return;
+    const all = [...this.store.connectors.values()].filter(
+      (c): c is Connector & { from: { node: string; anchor: string }; to: { node: string; anchor: string } } =>
+        "node" in c.from && "node" in c.to && c.from.node !== c.to.node,
+    );
+    // Connected component around the selected node (undirected).
+    const adjacent = new Map<string, string[]>();
+    for (const c of all) {
+      if (!adjacent.has(c.from.node)) adjacent.set(c.from.node, []);
+      if (!adjacent.has(c.to.node)) adjacent.set(c.to.node, []);
+      adjacent.get(c.from.node)!.push(c.to.node);
+      adjacent.get(c.to.node)!.push(c.from.node);
+    }
+    if (!adjacent.has(node.id)) return;
+    const member = new Set<string>([node.id]);
+    const stack = [node.id];
+    while (stack.length) {
+      for (const nb of adjacent.get(stack.pop()!) ?? []) {
+        if (!member.has(nb)) {
+          member.add(nb);
+          stack.push(nb);
+        }
+      }
+    }
+    const component = all.filter((c) => member.has(c.from.node));
+    if (!component.length) return;
+    if (component.every((c) => c.from.anchor === "s" && c.to.anchor === "n")) return;
+
+    // A strict hierarchy: exactly one root, one parent each, no cycles.
+    const incoming = new Map<string, number>();
+    for (const c of component) {
+      incoming.set(c.to.node, (incoming.get(c.to.node) ?? 0) + 1);
+    }
+    const roots = [...member].filter((id) => !incoming.has(id));
+    const isHierarchy =
+      roots.length === 1 &&
+      [...incoming.values()].every((n) => n === 1) &&
+      component.length === member.size - 1;
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const btn = document.createElement("button");
+    btn.textContent = "Treat as tree";
+    btn.title = "Re-anchor these connections as reporting lines and tidy the layout";
+    btn.addEventListener("click", () => {
+      if (!isHierarchy) {
+        void noticeDialog(
+          "These connections aren't a strict hierarchy — every node needs exactly one parent, with a single root and no cycles.",
+        );
+        return;
+      }
+      const memberNodes = [...member]
+        .map((id) => this.store.getNode(id))
+        .filter((n): n is Node => !!n);
+      const positions = tree(memberNodes, component);
+      this.store.transact(() => {
+        for (const c of component) {
+          this.store.updateConnector(c.id, {
+            from: { ...c.from, anchor: "s" },
+            to: { ...c.to, anchor: "n" },
+          } as Partial<Connector>);
+        }
+        for (const n of memberNodes) {
+          const p = positions.get(n.id);
+          if (p && (n.x !== p.x || n.y !== p.y)) {
+            this.store.updateNode(n.id, { x: p.x, y: p.y });
+          }
+        }
+      });
+      this.onChange();
+      this.scheduleRefresh();
+    });
+    actions.appendChild(btn);
+    this.inspector.appendChild(actions);
   }
 
   /** Structured editor for the data bag: one row per field, add/remove,
