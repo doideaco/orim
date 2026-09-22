@@ -44,7 +44,10 @@ Encrypt at rest via your volume/filesystem encryption (LUKS, EBS, etc.).
   against the issuer's JWKS (RS256/ES256) with issuer, audience and
   expiry checks; login state nonces are single-use and expire after 10
   minutes. Set `ORIM_OIDC_REQUIRED=1` to disable password auth entirely.
-  The first user ever created becomes the admin.
+  The first user ever created becomes the admin. The complete flow —
+  discovery, authorization redirect, token exchange, live JWKS signature
+  verification, and audit logging — is verified end-to-end against
+  Keycloak 26.
 
 ## Authorization
 
