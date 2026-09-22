@@ -146,6 +146,16 @@ docker compose up -d        # → http://localhost:1234
 See [DEPLOY.md](DEPLOY.md), [SECURITY.md](SECURITY.md) and
 [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
+## Documentation
+
+- **[The Orim guide](docs/guide.html)** — rich how-tos for every feature,
+  from canvas basics and keyboard authoring to linked tables, workshops,
+  history and the admin console
+- **[Format spec](docs/index.html)** — the board format, with its
+  [JSON Schema](docs/orim.schema.json)
+- [DEPLOY.md](DEPLOY.md) · [SECURITY.md](SECURITY.md) ·
+  [ACCESSIBILITY.md](ACCESSIBILITY.md) · [LICENSING.md](LICENSING.md)
+
 ## Developing
 
 Requires Node ≥ 22.5 (the sync server uses built-in `node:sqlite`) and pnpm.

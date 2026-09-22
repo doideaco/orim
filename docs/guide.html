@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orim Guide — how to use every feature</title>
+  <meta name="description" content="Rich how-tos for every Orim feature: boards, diagrams, tables, bindings, linked data, workshops, history, sharing, accessibility and agents." />
+  <style>
+    :root {
+      --ink: #1f2430;
+      --muted: #6b7280;
+      --faint: #9ca3af;
+      --border: rgba(0, 0, 0, 0.09);
+      --accent: #4f7cff;
+      --bg: #fbfbfa;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.6;
+      font-size: 15.5px;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, kbd {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.86em;
+    }
+    code { background: #f1f2f0; border-radius: 5px; padding: 1px 6px; }
+    kbd {
+      background: #fff;
+      border: 1px solid #d5d7dc;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 1px 7px;
+      font-size: 0.8em;
+      color: #40444f;
+      white-space: nowrap;
+    }
+    pre {
+      background: var(--ink); color: #e7eaf0;
+      border-radius: 12px;
+      padding: 16px 20px;
+      overflow-x: auto;
+      font-size: 13px; line-height: 1.6;
+    }
+    pre code { background: none; padding: 0; color: inherit; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      max-width: 1180px;
+      margin: 0 auto;
+      gap: 40px;
+      padding: 0 28px;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      nav.toc { position: static !important; max-height: none !important; }
+    }
+
+    header.top {
+      max-width: 1180px; margin: 0 auto;
+      padding: 22px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 18px;
+    }
+    header.top .brand { display: flex; align-items: baseline; gap: 10px; }
+    header.top img { height: 22px; display: block; }
+    header.top .brand span { font-size: 13px; color: var(--faint); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+    header.top nav { display: flex; gap: 18px; font-size: 14px; }
+    header.top nav a { color: var(--muted); }
+
+    nav.toc {
+      position: sticky;
+      top: 24px;
+      align-self: start;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      font-size: 13px;
+      padding: 6px 0 40px;
+    }
+    nav.toc h4 {
+      margin: 18px 0 6px;
+      font-size: 10.5px; font-weight: 700;
+      letter-spacing: 0.07em; text-transform: uppercase;
+      color: var(--faint);
+    }
+    nav.toc a { display: block; padding: 3px 0; color: var(--muted); }
+    nav.toc a:hover { color: var(--ink); text-decoration: none; }
+
+    main { padding-bottom: 120px; min-width: 0; }
+    main h1 {
+      font-size: clamp(30px, 4vw, 40px);
+      letter-spacing: -0.02em;
+      margin: 18px 0 10px;
+    }
+    main p.lede { color: var(--muted); font-size: 17px; max-width: 640px; margin-top: 0; }
+    main h2 {
+      font-size: 24px;
+      letter-spacing: -0.015em;
+      margin: 64px 0 6px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+    }
+    main h3 { font-size: 16.5px; margin: 30px 0 8px; }
+    main p, main li { color: #3c4250; max-width: 720px; }
+    main ol, main ul { padding-left: 22px; }
+    main li { margin: 4px 0; }
+
+    .tip, .note {
+      max-width: 720px;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 14px;
+      margin: 14px 0;
+    }
+    .tip { background: #eef7ee; border: 1px solid #d4ead6; }
+    .tip::before { content: "Tip — "; font-weight: 650; }
+    .note { background: #eef3ff; border: 1px solid #dbe6ff; }
+    .note::before { content: "Note — "; font-weight: 650; }
+
+    table.keys {
+      border-collapse: collapse;
+      font-size: 14px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 14px 0;
+    }
+    table.keys td, table.keys th {
+      padding: 8px 16px;
+      border-bottom: 1px solid rgba(0,0,0,.05);
+      text-align: left;
+    }
+    table.keys tr:last-child td { border-bottom: none; }
+    table.keys th {
+      font-size: 11px; font-weight: 650;
+      letter-spacing: .05em; text-transform: uppercase;
+      color: var(--faint); background: #fafaf9;
+    }
+    table.keys td:first-child { white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <img src="../apps/web/public/orim.svg" alt="Orim" onerror="this.replaceWith(Object.assign(document.createElement('strong'),{textContent:'orim'}))" />
+    <span>Guide</span>
+  </div>
+  <nav>
+    <a href="index.html">Format spec</a>
+    <a href="https://github.com/doideaco/orim">GitHub</a>
+  </nav>
+</header>
+
+<div class="layout">
+<nav class="toc">
+  <h4>Start</h4>
+  <a href="#boards">Boards &amp; projects</a>
+  <a href="#canvas">Canvas basics</a>
+  <a href="#keyboard">Keyboard reference</a>
+  <h4>Diagramming</h4>
+  <a href="#connectors">Connectors</a>
+  <a href="#trees">Org charts &amp; trees</a>
+  <a href="#import">Import: files &amp; paste</a>
+  <a href="#media">Images &amp; live embeds</a>
+  <h4>Structured data</h4>
+  <a href="#tables">Tables</a>
+  <a href="#bindings">Cell-bound stickies</a>
+  <a href="#synthesis">Cluster synthesis</a>
+  <a href="#fields">Smart fields</a>
+  <a href="#feeds">Linked tables</a>
+  <a href="#datapanel">The data panel</a>
+  <h4>Working together</h4>
+  <a href="#share">Sharing &amp; roles</a>
+  <a href="#comments">Comments</a>
+  <a href="#workshops">Workshops</a>
+  <a href="#present">Present mode</a>
+  <a href="#history">Board history</a>
+  <h4>Beyond the canvas</h4>
+  <a href="#export">Exports</a>
+  <a href="#a11y">Accessibility</a>
+  <a href="#agents">Agents (MCP)</a>
+  <a href="#admin">Admin console</a>
+</nav>
+
+<main>
+  <h1>The Orim guide</h1>
+  <p class="lede">
+    Task-by-task how-tos for everything Orim does. Orim treats a board as
+    a structured document, so most features connect: the diagram you
+    import can be authored by keyboard, summed by a frame, fed by a
+    spreadsheet, read by a screen reader and edited by an agent.
+  </p>
+
+  <h2 id="boards">Boards &amp; projects</h2>
+  <h3>Create a board</h3>
+  <ol>
+    <li>On the start page, click <b>New board</b> and name it — or click a
+      <b>template card</b> (Retrospective, Kanban, Flowchart, Sprint table,
+      Org chart, Mind map, SWOT, Service blueprint) to start pre-built.</li>
+    <li>A board's URL is its identity: <code>/?b=my-board</code>. Sending
+      the URL is sharing it (see <a href="#share">Sharing</a>).</li>
+  </ol>
+  <h3>Organise boards into projects</h3>
+  <p>Hover a board card and click <b>Move…</b>, then type a project name.
+  The start page groups boards into project sections; boards without a
+  project sit under <i>Unfiled</i>. Moving is owner-only once a board has
+  been claimed.</p>
+  <h3>Duplicate, rename, delete</h3>
+  <p>All on the board card's hover actions. <b>Duplicate</b> copies the
+  whole board server-side into the same project (the copy starts
+  unclaimed, in link-edit mode). Deleting a board also deletes its
+  history and cannot be undone.</p>
+  <div class="note">Boards are local-first: every board you open is kept in
+  your browser (IndexedDB) and works offline; the server syncs and
+  persists. If the server is unreachable, the start page lists the boards
+  you've opened on this device.</div>
+
+  <h2 id="canvas">Canvas basics</h2>
+  <h3>Tools</h3>
+  <p>The left toolbar (or its keys): select <kbd>V</kbd>, pan
+  <kbd>H</kbd>, sticky <kbd>N</kbd>, rectangle <kbd>R</kbd>, ellipse
+  <kbd>O</kbd>, diamond <kbd>D</kbd>, text <kbd>T</kbd>, frame
+  <kbd>F</kbd>, connector <kbd>C</kbd>, pen <kbd>P</kbd>, table
+  <kbd>G</kbd>, comment <kbd>M</kbd>. Click the canvas with a creation
+  tool to place the object; text editing opens immediately where it makes
+  sense.</p>
+  <h3>Moving around</h3>
+  <p>Scroll to pan, pinch or <kbd>⌘</kbd>-scroll to zoom, <kbd>1</kbd>
+  zooms to fit, <kbd>0</kbd> resets to 100%. The minimap (bottom right)
+  shows where you are; drag it to jump.</p>
+  <h3>Selecting &amp; editing</h3>
+  <ul>
+    <li>Click selects; drag empty canvas for a marquee;
+      <kbd>Shift</kbd>-click adds to the selection; <kbd>⌘A</kbd> selects all.</li>
+    <li>Drag corners to resize. Double-click a sticky, shape or text to
+      edit its text (a real rich-text editor); <kbd>Esc</kbd> commits.</li>
+    <li>Arrow keys nudge the selection 8px; <kbd>Shift</kbd>+arrows 32px.
+      Frames carry their contents; locked objects stay put.</li>
+    <li><kbd>⌘C</kbd>/<kbd>⌘V</kbd> copy and paste — including <b>into a
+      different board or tab</b>: the copy travels through your system
+      clipboard, and bindings, frame contents and connector anchors all
+      survive. <kbd>⌘D</kbd> duplicates in place, <kbd>⌘]</kbd> brings to
+      front, <kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> undo and redo.</li>
+    <li>The <b>swatch</b> at the bottom of the toolbar opens the color and
+      fill popover; it also switches a selected shape's kind
+      (sticky ↔ rect/ellipse/diamond/pill) in place — text, data and
+      bindings survive the conversion.</li>
+  </ul>
+  <h3>Frames</h3>
+  <p>Frames group content spatially: anything placed inside belongs to the
+  frame, moves with it, and defines the board's <b>reading order</b> —
+  which drives exports, the accessibility tree and present mode.
+  Double-click the title strip to rename.</p>
+
+  <h2 id="keyboard">Keyboard reference</h2>
+  <table class="keys">
+    <thead><tr><th>Keys</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td><kbd>V</kbd> <kbd>H</kbd> <kbd>N</kbd> <kbd>R</kbd> <kbd>O</kbd> <kbd>D</kbd> <kbd>T</kbd> <kbd>F</kbd> <kbd>C</kbd> <kbd>P</kbd> <kbd>G</kbd> <kbd>M</kbd></td><td>Pick a tool</td></tr>
+      <tr><td><kbd>1</kbd> / <kbd>0</kbd></td><td>Zoom to fit / 100%</td></tr>
+      <tr><td><kbd>\</kbd></td><td>Toggle the data panel</td></tr>
+      <tr><td><kbd>⌘Z</kbd> / <kbd>⇧⌘Z</kbd></td><td>Undo / redo</td></tr>
+      <tr><td><kbd>⌘A</kbd> <kbd>⌘C</kbd> <kbd>⌘V</kbd> <kbd>⌘D</kbd> <kbd>⌘]</kbd></td><td>Select all · copy · paste (works across boards) · duplicate · bring to front</td></tr>
+      <tr><td>Arrows / <kbd>Shift</kbd>+arrows</td><td>Nudge selection 8px / 32px (frames carry contents)</td></tr>
+      <tr><td>Arrows on a tree node</td><td>Navigate: parent, nearest child, siblings</td></tr>
+      <tr><td><kbd>Alt</kbd>+arrows</td><td>Nudge a tree node (navigation stays on plain arrows)</td></tr>
+      <tr><td><kbd>Tab</kbd> / <kbd>Enter</kbd></td><td>Add a child / a sibling to the selected node (see <a href="#trees">trees</a>)</td></tr>
+      <tr><td><kbd>Delete</kbd></td><td>Delete selection (connectors, comments and votes follow)</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Commit text · clear selection · exit history or present mode</td></tr>
+      <tr><td><kbd>→</kbd> <kbd>←</kbd> <kbd>Space</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Navigate slides while presenting</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="connectors">Connectors</h2>
+  <h3>Draw one</h3>
+  <ol>
+    <li>Hover any node — four round <b>ports</b> appear on its edges.</li>
+    <li>Drag from a port to another node (or use the connector tool
+      <kbd>C</kbd> and drag between objects).</li>
+  </ol>
+  <p>Connectors are FigJam-style elbows with rounded joins that
+  <b>route around obstacles</b> automatically and re-route live as you
+  move things. Double-click a connector to give it a label.</p>
+  <h3>Connect to a table row — or bind to a cell</h3>
+  <ul>
+    <li>Drop the connector on a table's <b>header or edge</b> for an
+      ordinary arrow to the table.</li>
+    <li>Drop it on a <b>row</b> and the arrow anchors to that specific row,
+      following it as the table moves.</li>
+    <li>Drop it from a sticky onto a <b>specific cell</b> (the cell
+      highlights while you hover) and instead of an arrow you create a
+      <b>cell binding</b> — see <a href="#bindings">cell-bound stickies</a>.</li>
+  </ul>
+
+  <h2 id="trees">Org charts &amp; trees</h2>
+  <p>Any strictly hierarchical diagram — org charts, mind maps, outlines —
+  gets first-class treatment. Trees imported from CSV, or started by hand,
+  keep themselves tidy.</p>
+  <h3>Author with the keyboard</h3>
+  <ul>
+    <li>Select any node and press <kbd>Tab</kbd>: a connected child
+      appears, inherits its siblings' look, opens ready to type — and the
+      <b>whole tree rebalances</b> (children grouped under parents, every
+      parent centered over its subtree).</li>
+    <li><kbd>Enter</kbd> adds a sibling. <kbd>Tab</kbd> on a lone sticky
+      starts a brand-new tree.</li>
+    <li>A selected tree node shows a <b>+</b> button beneath it — clicking
+      it is the mouse version of <kbd>Tab</kbd>.</li>
+    <li>Arrow keys walk the structure: up to the parent, down to the
+      nearest child, left/right between siblings. <kbd>Alt</kbd>+arrows
+      move the node instead.</li>
+  </ul>
+  <div class="tip">Drop <code>samples/team.csv</code> (a Name/Role/Manager
+  sheet) on the canvas and you get a balanced org chart instantly — then
+  Tab your way to the new hires.</div>
+
+  <h2 id="import">Import: files &amp; paste</h2>
+  <h3>Drop a spreadsheet, get the right diagram</h3>
+  <p>Drag a <b>CSV, TSV or Excel</b> file onto the canvas. Orim inspects
+  the data's shape and builds:</p>
+  <ul>
+    <li>a column referencing another column's values → an <b>org chart</b></li>
+    <li>from/to columns → a <b>dependency graph</b></li>
+    <li>a low-cardinality status column → <b>kanban lanes</b></li>
+    <li>anything else → a <b>table</b></li>
+  </ul>
+  <p>Every generated object carries its source row in its data bag, so the
+  diagram is still a database.</p>
+  <h3>Paste almost anything</h3>
+  <ul>
+    <li><b>Mermaid</b> flowcharts become live, routed diagrams.</li>
+    <li><b>Markdown</b> outlines become framed sticky sections.</li>
+    <li><b>Spreadsheet cells</b> (TSV from Excel/Sheets) run the same
+      inference as file drops.</li>
+    <li><b>Plain text</b> becomes stickies, one per line.</li>
+    <li>A <b>URL</b> becomes a live embed; an <b>image</b> becomes an image
+      node (see below).</li>
+  </ul>
+
+  <h2 id="media">Images &amp; live embeds</h2>
+  <h3>Images</h3>
+  <p>Drop an image file or paste a screenshot. Images are stored inside
+  the document (downscaled to stay portable — max 1600px edge), so boards
+  remain one self-contained file: no blob store, works air-gapped, and
+  images survive export to SVG.</p>
+  <h3>Live website embeds</h3>
+  <ol>
+    <li>Drop a link (from the address bar, a bookmark) or paste a URL.</li>
+    <li>A resizable frame shows the <b>live site</b>. Move and resize it
+      like any object — clicks pass through to the board.</li>
+    <li><b>Double-click</b> the embed to interact: scroll the page, click
+      its links. <kbd>Esc</kbd> or clicking the board hands the pointer
+      back.</li>
+  </ol>
+  <div class="note">Sites that forbid framing (banks, most Google apps)
+  show an empty card — the hostname chip above it still says what it is.
+  Embeds are sandboxed with least privilege and send no referrer.</div>
+
+  <h2 id="tables">Tables</h2>
+  <ul>
+    <li>Create with the table tool <kbd>G</kbd>. Double-click any cell to
+      edit; <kbd>Tab</kbd> moves through cells; double-click a header to
+      rename the column.</li>
+    <li>Add rows and columns from the data panel's table actions
+      (<kbd>\</kbd> with the table selected).</li>
+    <li>Numeric columns grow a <b>totals footer</b> automatically, and the
+      board's currency setting formats cost-like columns (see
+      <a href="#fields">smart fields</a>).</li>
+  </ul>
+
+  <h2 id="bindings">Cell-bound stickies</h2>
+  <p>A sticky can be a <b>live view of one table cell</b>. The cell is the
+  source of truth; the sticky's position is entirely its own — layout is
+  independent of data.</p>
+  <h3>Create a binding</h3>
+  <ul>
+    <li><b>From the canvas:</b> drag a connector from a sticky onto the
+      exact cell (it highlights). An empty cell first adopts the sticky's
+      text, so linking never loses work; a filled cell wins.</li>
+    <li><b>From the table:</b> select it, open the data panel and use
+      <b>Rows → stickies</b> to materialise a bound sticky per row.</li>
+  </ul>
+  <h3>How bindings behave</h3>
+  <ul>
+    <li>Edit the cell → the sticky updates. Edit the sticky → the cell
+      updates. Everyone sees both, live.</li>
+    <li>Select a bound sticky (or its table) and an <b>animated dashed
+      link</b> shows the relationship — it's a data link, not a drawn
+      line, and it never exports.</li>
+    <li>Bindings survive copy/paste (copy table + stickies together and
+      the copies bind to the copied table) and
+      <a href="#feeds">linked-table refreshes</a>.</li>
+  </ul>
+
+  <h2 id="synthesis">Cluster synthesis</h2>
+  <p>The reverse trick: turn a wall of stickies into structured data.</p>
+  <ol>
+    <li>Select a pile of stickies (marquee or <kbd>⌘A</kbd>).</li>
+    <li>In the data panel, choose <b>Synthesize table</b>.</li>
+    <li>Orim detects the spatial clusters (frame titles become cluster
+      names), builds a table with one row per sticky — and <b>binds every
+      sticky to its row</b>, closing the loop: cell edits flow back to the
+      wall.</li>
+  </ol>
+
+  <h2 id="fields">Smart fields</h2>
+  <h3>Put numbers on stickies</h3>
+  <ol>
+    <li>Select a sticky, open the data panel (<kbd>\</kbd>) and add a
+      field: <code>estimate: 5</code>, <code>cost: 1200</code>.</li>
+    <li>Numeric fields render as <b>chips</b> on the sticky.
+      Double-click a chip to edit the value in place.</li>
+  </ol>
+  <h3>Zero-config aggregates</h3>
+  <p>Put stickies with a shared numeric field inside a frame and the frame
+  grows an <b>aggregate chip</b> — no setup. Click the chip to cycle
+  <b>Σ sum → average → min → max → count</b>. Sprint capacity, budget
+  workshops and RICE scoring fall out for free.</p>
+  <h3>Currency</h3>
+  <p>Cost-shaped fields format with your currency. Set it once per board
+  at the top of the data panel (auto picks from your locale).</p>
+  <div class="tip">Agents can write fields over MCP — "estimate these 20
+  stickies" — and the chips, aggregates and exports update live.</div>
+
+  <h2 id="feeds">Linked tables</h2>
+  <p>Feed a table from a CSV URL — a published Google Sheet, an internal
+  BI export, any endpoint your server's operator has allow-listed.</p>
+  <h3>Set up</h3>
+  <ol>
+    <li><b>Operator, once:</b> set <code>ORIM_FETCH_ALLOW</code> on the
+      server to the hosts tables may fetch from (e.g.
+      <code>docs.google.com,data.internal.example</code>). Unset, the
+      feature is off and the server makes no outbound calls.</li>
+    <li><b>In Google Sheets:</b> File → Share → Publish to web → CSV, and
+      copy the URL. (Any plain CSV/TSV endpoint works the same.)</li>
+    <li><b>In Orim:</b> select the table, open the data panel, click
+      <b>Link to URL…</b> and paste it.</li>
+  </ol>
+  <h3>Refreshing</h3>
+  <ul>
+    <li>Click <b>Refresh from &lt;host&gt;</b> anytime; boards also refresh
+      stale feeds (&gt;5 minutes) when opened.</li>
+    <li>The source is <b>one-directional truth</b>: refresh replaces
+      columns and rows — but matches columns by header name and rows by
+      first-column key, so <b>bound stickies, aggregate settings and
+      totals survive</b>.</li>
+    <li>Every fetch is audited server-side; responses cap at 2&nbsp;MB.</li>
+  </ul>
+
+  <h2 id="datapanel">The data panel</h2>
+  <p><kbd>\</kbd> (or the board menu → Data) opens the panel: the board as
+  data rather than pixels.</p>
+  <ul>
+    <li><b>Outline</b> — every object in reading order; click to select
+      and jump the camera.</li>
+    <li><b>Inspector</b> — the selected object's type, geometry, bindings
+      and typed fields, with add/remove rows and an <i>Edit as JSON</i>
+      escape hatch.</li>
+    <li><b>Table actions</b> — rows/columns, rows → stickies, linked
+      sources, synthesis.</li>
+  </ul>
+
+  <h2 id="share">Sharing &amp; roles</h2>
+  <h3>Share a board</h3>
+  <p>Board menu → <b>Share</b>. Pick a mode:</p>
+  <ul>
+    <li><b>Anyone with the link can edit</b> (default for new boards)</li>
+    <li><b>Anyone with the link can view</b> — viewers' connections are
+      read-only <i>at the sync server</i>, not just in the UI</li>
+    <li><b>Private</b> — only people you name connect at all</li>
+  </ul>
+  <p>Grant specific people <b>editor</b> or <b>viewer</b> by account name.
+  The first time you restrict a board you become its <b>owner</b>;
+  share settings, rename, move and delete are owner-only from then on.</p>
+  <h3>Signing in</h3>
+  <p>Password accounts, or single sign-on through your organisation's
+  identity provider when the server has OIDC configured (the sign-in
+  dialog shows the SSO button automatically).</p>
+  <div class="note">Local-first honesty: someone whose access is revoked
+  keeps the copy their browser already synced — clearly labelled
+  read-only — but receives nothing new, like a revoked file share.</div>
+
+  <h2 id="comments">Comments</h2>
+  <ul>
+    <li>Comment tool <kbd>M</kbd>, then click an object (the thread
+      follows it) or empty canvas (it stays at that spot).</li>
+    <li>Pins show on the board; click one to read, reply or
+      <b>resolve</b>. Unresolved comments are announced to screen readers
+      and appear in the accessibility tree.</li>
+  </ul>
+
+  <h2 id="workshops">Workshops</h2>
+  <h3>Dot voting</h3>
+  <ol>
+    <li>Board menu → <b>Vote</b>: set a budget per person (e.g. 5 dots)
+      and optionally a timer.</li>
+    <li>Everyone clicks stickies to spend dots — live badges show totals,
+      and simultaneous votes can't clobber each other (each vote is its
+      own CRDT entry).</li>
+    <li>Finish with <b>Rank into table</b>: one click builds a
+      results table, ordered by votes, with every sticky bound to its
+      row.</li>
+  </ol>
+  <h3>Shared timer</h3>
+  <p>Board menu → <b>Timer</b>. Everyone sees the same countdown; a gentle
+  chime marks zero.</p>
+  <h3>Private drafts</h3>
+  <ol>
+    <li>Board menu → <b>Drafts</b>: write ideas only you can see (they
+      live on your device until revealed).</li>
+    <li><b>Reveal</b> puts your drafts on the board — or the facilitator
+      hits <b>Everyone reveal</b> and all drafts land simultaneously.
+      Nobody anchors on the loudest voice.</li>
+  </ol>
+
+  <h2 id="present">Present mode</h2>
+  <ol>
+    <li>Put your content in <b>frames</b> — each frame is a slide, in the
+      board's reading order.</li>
+    <li>Board menu → <b>Present</b>. The camera glides to slide one and
+      the UI gets out of the way.</li>
+    <li><kbd>→</kbd>/<kbd>Space</kbd> and <kbd>←</kbd> move between
+      slides; <kbd>Esc</kbd> exits.</li>
+  </ol>
+  <p>The board stays live while you present — collaborators' edits appear
+  on the slide — and every slide change is announced to screen readers.
+  Viewers can present too.</p>
+
+  <h2 id="history">Board history</h2>
+  <ul>
+    <li>Board menu → <b>History</b>. Versions are captured automatically
+      as the board changes; <b>Save labelled version…</b> marks a moment
+      you care about ("pre-workshop baseline") — labelled versions are
+      never pruned.</li>
+    <li>Click a version to <b>time-travel</b>: the canvas shows that
+      state, read-only. <kbd>Esc</kbd> or <b>Back to now</b> returns.</li>
+    <li><b>Restore this version</b> rolls the board back — applied as an
+      ordinary edit, so it syncs to everyone, lands in the audit log with
+      your name, and <kbd>⌘Z</kbd> undoes it.</li>
+  </ul>
+
+  <h2 id="export">Exports</h2>
+  <p>Board menu → <b>Export</b>:</p>
+  <ul>
+    <li><b>Markdown</b> — the board in reading order: frames as sections,
+      real Markdown tables, field values, vote counts, connection lists.
+      Paste it back into a board and it rebuilds.</li>
+    <li><b>Mermaid</b> — connected diagrams as diagram-as-code (also
+      round-trips via paste).</li>
+    <li><b>SVG / PNG</b> — vector and raster snapshots (images embed).</li>
+    <li><b>JSON</b> — the full open format, validated by a
+      <a href="orim.schema.json">published JSON Schema</a> generated from
+      the source of truth. See the <a href="index.html">format spec</a>.</li>
+  </ul>
+
+  <h2 id="a11y">Accessibility</h2>
+  <p>Every board is mirrored as a native <b>ARIA tree</b> in reading
+  order — the same order exports use, so what a screen reader hears is
+  what the Markdown says.</p>
+  <ul>
+    <li>Tab into the board contents tree: arrows navigate, frames and
+      tables expand, <kbd>Enter</kbd> edits text in place,
+      <kbd>Delete</kbd> removes. Selection follows focus and the camera
+      follows selection.</li>
+    <li>Rich labels: "Sticky note: Open file format, green, 3 votes,
+      estimate 5"; connectors described in prose; frames announce their
+      aggregates.</li>
+    <li>Additions, removals and edits — including collaborators' and
+      agents' — are announced via a polite live region.</li>
+    <li>On the canvas itself, diagrams can be <b>read, authored and
+      arranged</b> without a pointer: arrow navigation, Tab/Enter
+      authoring, arrow-key nudge.</li>
+  </ul>
+  <p>Conformance status and known gaps:
+  <a href="https://github.com/doideaco/orim/blob/main/ACCESSIBILITY.md">ACCESSIBILITY.md</a>.</p>
+
+  <h2 id="agents">Agents (MCP)</h2>
+  <p>Orim ships an MCP server, so an LLM agent is a first-class
+  collaborator — its edits ride the same CRDT pipeline as everyone
+  else's, appearing live on the board.</p>
+  <pre><code>{
+  "mcpServers": {
+    "orim": {
+      "command": "node",
+      "args": ["--import", "tsx", "apps/mcp/src/server.ts"]
+    }
+  }
+}</code></pre>
+  <p>Tools: <code>list_boards</code>, <code>read_board</code>
+  (markdown/json/mermaid/svg), <code>create_objects</code> (with
+  <code>$n</code> cross-references and overlap warnings),
+  <code>update_objects</code>, <code>delete_objects</code>,
+  <code>apply_layout</code>, <code>find_empty_space</code>,
+  <code>synthesize_table</code>.</p>
+  <div class="note">Agent connections are guests by default; set
+  <code>ORIM_TOKEN</code> to a session token to act as a user under your
+  board roles and audit trail.</div>
+
+  <h2 id="admin">Admin console</h2>
+  <p>The first account created on a server is its admin. Visit
+  <code>/admin</code> (an <b>Admin</b> button appears on the start page)
+  for:</p>
+  <ul>
+    <li><b>Overview</b> — users, boards, active sessions, audit volume.</li>
+    <li><b>Users</b> — promote/demote admins, sign a user out everywhere,
+      remove accounts (their boards survive unclaimed). Guardrails are
+      server-enforced: never zero admins, no self-delete.</li>
+    <li><b>Audit log</b> — filterable by user, action and board, with
+      paging; every sign-in, connection, share change, restore and admin
+      action. Deployment, hardening and SIEM notes:
+      <a href="https://github.com/doideaco/orim/blob/main/SECURITY.md">SECURITY.md</a>
+      and
+      <a href="https://github.com/doideaco/orim/blob/main/DEPLOY.md">DEPLOY.md</a>.</li>
+  </ul>
+</main>
+</div>
+
+</body>
+</html>
