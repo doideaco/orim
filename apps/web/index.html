@@ -360,56 +360,64 @@
         color: #9ca3af;
         margin: 0 0 14px;
       }
-      #start section { margin-bottom: 40px; }
-      #template-row { display: flex; gap: 12px; flex-wrap: wrap; }
+      #start section { margin-bottom: 48px; }
+      #start .card {
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 14px;
+        overflow: hidden;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(15, 18, 25, 0.04), 0 4px 12px rgba(15, 18, 25, 0.04);
+        transition: transform 0.14s ease, box-shadow 0.14s ease;
+      }
+      #start .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 4px rgba(15, 18, 25, 0.05), 0 12px 28px rgba(15, 18, 25, 0.12);
+      }
+      #template-row { display: flex; gap: 14px; flex-wrap: wrap; }
       .template-card {
         font: inherit; text-align: left;
-        display: flex; flex-direction: column; gap: 3px;
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 14px 16px;
-        min-width: 170px;
-        cursor: pointer;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        display: flex; flex-direction: column;
+        padding: 0;
+        width: 198px;
       }
-      .template-card:hover { border-color: var(--accent); }
-      .template-card strong { font-size: 13.5px; color: var(--ink); }
-      .template-card span { font-size: 12px; color: #6b7280; }
+      .template-card canvas { display: block; border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+      .template-card .meta {
+        display: flex; flex-direction: column; gap: 2px;
+        padding: 10px 13px 12px;
+      }
+      .template-card strong { font-size: 13px; color: var(--ink); }
+      .template-card span { font-size: 11.5px; color: #8b909b; line-height: 1.35; }
       #board-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 16px;
+        gap: 20px;
       }
-      .board-card {
-        position: relative;
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        overflow: hidden;
-        cursor: pointer;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      .board-card { position: relative; }
+      .board-card canvas {
+        display: block;
+        width: 100%; height: auto;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       }
-      .board-card:hover { border-color: var(--accent); }
-      .board-card canvas { display: block; width: 100%; border-bottom: 1px solid var(--border); }
       .board-card .meta {
-        display: flex; flex-direction: column; gap: 1px;
-        padding: 10px 14px 12px;
+        display: flex; flex-direction: column; gap: 2px;
+        padding: 11px 15px 13px;
       }
-      .board-card .meta strong { font-size: 13.5px; }
-      .board-card .meta span { font-size: 11.5px; color: #9ca3af; }
+      .board-card .meta strong { font-size: 14px; }
+      .board-card .meta span { font-size: 11.5px; color: #8b909b; }
       .board-card .card-actions {
-        position: absolute; top: 8px; right: 8px;
-        display: none; gap: 4px;
+        position: absolute; top: 10px; right: 10px;
+        display: none; gap: 5px;
       }
       .board-card:hover .card-actions { display: flex; }
       .card-actions button {
-        font: inherit; font-size: 11px;
-        background: rgba(255,255,255,0.95);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 3px 8px;
+        font: inherit; font-size: 11px; font-weight: 500;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 7px;
+        padding: 4px 10px;
         cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
       }
       .card-actions button:hover { background: #f3f3f1; }
       #start .hint { color: #9ca3af; font-size: 13px; }

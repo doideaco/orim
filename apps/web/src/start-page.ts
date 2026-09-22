@@ -42,35 +42,66 @@ function recents(): { name: string; at: number }[] {
   }
 }
 
-function drawPreview(canvas: HTMLCanvasElement, info: BoardInfo): void {
+interface PreviewNode {
+  x: number; y: number; w: number; h: number;
+  type: string; color: PaletteColor | null;
+}
+
+function drawPreview(canvas: HTMLCanvasElement, nodes: PreviewNode[]): void {
   const ctx = canvas.getContext("2d")!;
   const W = canvas.width;
   const H = canvas.height;
-  ctx.fillStyle = CANVAS_BG;
+  ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(0, 0, W, H);
-  if (!info.nodes.length) return;
-  const minX = Math.min(...info.nodes.map((n) => n.x));
-  const minY = Math.min(...info.nodes.map((n) => n.y));
-  const maxX = Math.max(...info.nodes.map((n) => n.x + n.w));
-  const maxY = Math.max(...info.nodes.map((n) => n.y + n.h));
-  const pad = 14;
-  const scale = Math.min((W - pad * 2) / Math.max(1, maxX - minX), (H - pad * 2) / Math.max(1, maxY - minY), 0.5);
+  // A whisper of the dot grid, so previews read as canvas.
+  ctx.fillStyle = "rgba(31, 36, 48, 0.05)";
+  for (let x = 10; x < W; x += 22) {
+    for (let y = 10; y < H; y += 22) ctx.fillRect(x, y, 1.5, 1.5);
+  }
+  if (!nodes.length) return;
+  const minX = Math.min(...nodes.map((n) => n.x));
+  const minY = Math.min(...nodes.map((n) => n.y));
+  const maxX = Math.max(...nodes.map((n) => n.x + n.w));
+  const maxY = Math.max(...nodes.map((n) => n.y + n.h));
+  const pad = 16;
+  const scale = Math.min(
+    (W - pad * 2) / Math.max(1, maxX - minX),
+    (H - pad * 2) / Math.max(1, maxY - minY),
+    0.5,
+  );
   const ox = (W - (maxX - minX) * scale) / 2 - minX * scale;
   const oy = (H - (maxY - minY) * scale) / 2 - minY * scale;
-  for (const n of info.nodes) {
-    if (n.type === "frame") {
-      ctx.fillStyle = "#FFFFFF";
-      ctx.strokeStyle = "#D6D6D2";
-    } else {
-      ctx.fillStyle = n.color ? PALETTE[n.color].fill : "#E5E7EB";
-      ctx.strokeStyle = "transparent";
-    }
+  for (const n of nodes) {
     const x = n.x * scale + ox;
     const y = n.y * scale + oy;
+    const w = Math.max(2.5, n.w * scale);
+    const h = Math.max(2.5, n.h * scale);
     ctx.beginPath();
-    ctx.roundRect(x, y, Math.max(2, n.w * scale), Math.max(2, n.h * scale), 1.5);
-    ctx.fill();
-    if (n.type === "frame") ctx.stroke();
+    ctx.roundRect(x, y, w, h, 2);
+    if (n.type === "table") {
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fill();
+      ctx.strokeStyle = "#CFCFCA";
+      ctx.stroke();
+      const headerH = Math.max(3, Math.min(7, h * 0.25));
+      ctx.fillStyle = "#E9E9E6";
+      ctx.fillRect(x, y, w, headerH);
+      ctx.strokeStyle = "#E3E3DF";
+      ctx.beginPath();
+      for (let ly = y + headerH * 2; ly < y + h - 2; ly += headerH) {
+        ctx.moveTo(x, ly);
+        ctx.lineTo(x + w, ly);
+      }
+      ctx.stroke();
+    } else if (n.type === "frame") {
+      ctx.fillStyle = CANVAS_BG;
+      ctx.fill();
+      ctx.strokeStyle = "#D6D6D2";
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = n.color ? PALETTE[n.color].fill : "#DDE1E6";
+      ctx.fill();
+    }
   }
 }
 
@@ -121,10 +152,30 @@ export async function renderStartPage(): Promise<void> {
   const templateRow = root.querySelector("#template-row")!;
   for (const t of TEMPLATES) {
     const card = document.createElement("button");
-    card.className = "template-card";
-    card.innerHTML = `<strong></strong><span></span>`;
-    card.querySelector("strong")!.textContent = t.name;
-    card.querySelector("span")!.textContent = t.description;
+    card.className = "card template-card";
+    // Each template card previews what the template actually builds.
+    let i = 0;
+    const built = t.build(() => `t${i++}`);
+    const preview = document.createElement("canvas");
+    preview.width = 392;
+    preview.height = 208;
+    preview.style.width = "196px";
+    preview.style.height = "104px";
+    drawPreview(
+      preview,
+      built.nodes.map((n) => ({
+        x: n.x, y: n.y, w: n.w, h: n.h, type: n.type,
+        color: "color" in n ? n.color : null,
+      })),
+    );
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const title = document.createElement("strong");
+    title.textContent = t.name;
+    const desc = document.createElement("span");
+    desc.textContent = t.description;
+    meta.append(title, desc);
+    card.append(preview, meta);
     card.addEventListener("click", () => {
       const name = prompt(`Board name for "${t.name}"`, t.id);
       if (name !== null) openBoard(slugify(name), t.id);
@@ -156,11 +207,11 @@ export async function renderStartPage(): Promise<void> {
   }
   for (const info of boards) {
     const card = document.createElement("div");
-    card.className = "board-card";
+    card.className = "card board-card";
     const preview = document.createElement("canvas");
-    preview.width = 248;
-    preview.height = 140;
-    drawPreview(preview, info);
+    preview.width = 496;
+    preview.height = 280;
+    drawPreview(preview, info.nodes);
     const meta = document.createElement("div");
     meta.className = "meta";
     const title = document.createElement("strong");
