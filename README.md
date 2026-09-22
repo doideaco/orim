@@ -79,8 +79,13 @@ decision.
   budget, click to vote, live badges and a countdown bar, then **rank the
   results into a bound table** in one click; vote counts flow into
   Markdown exports, the accessibility tree and MCP reads
-- Cluster synthesis (above) closes the loop: ideate → cluster → vote →
-  ranked actions
+- **Shared timer**: one click, everyone sees the same countdown, gentle
+  chime at zero
+- **Private drafts**: write ideas only you can see, then reveal — or have
+  the facilitator broadcast "everyone reveal" and all drafts land on the
+  board simultaneously (the anti-anchoring move Miro charges for)
+- Cluster synthesis (above) closes the loop: draft privately → reveal →
+  cluster → vote → ranked actions
 
 **Agent-native (MCP)**
 - A built-in MCP server exposes boards as structured data:

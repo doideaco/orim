@@ -156,6 +156,8 @@
         padding: 4px;
         display: flex; gap: 2px;
       }
+      #btn-timer,
+      #btn-drafts,
       #btn-vote,
       #btn-share,
       #btn-data,
@@ -168,14 +170,73 @@
         cursor: pointer;
         color: #40444f;
       }
-      #btn-export:hover, #btn-data:hover, #btn-share:hover, #btn-vote:hover { background: rgba(0, 0, 0, 0.06); }
-      #btn-vote.active { background: var(--accent); color: #fff; }
+      #btn-export:hover, #btn-data:hover, #btn-share:hover, #btn-vote:hover,
+      #btn-timer:hover, #btn-drafts:hover { background: rgba(0, 0, 0, 0.06); }
+      #btn-vote.active, #btn-drafts.active { background: var(--accent); color: #fff; }
 
-      #votebar {
+      #drafts-panel {
+        position: fixed;
+        left: 12px; bottom: 52px;
+        z-index: 11;
+        width: 270px;
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px;
+      }
+      #drafts-panel.open { display: flex; }
+      #drafts-panel h3 { margin: 0; font-size: 13.5px; }
+      #drafts-panel .hint { font-size: 11.5px; color: #9ca3af; margin: -6px 0 0; }
+      #drafts-panel input {
+        font: inherit; font-size: 13px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 10px;
+        background: #fff; color: var(--ink);
+      }
+      #drafts-panel input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+      #drafts-list {
+        display: flex; flex-direction: column; gap: 5px;
+        max-height: 220px; overflow-y: auto;
+      }
+      #drafts-list .draft {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 12.5px;
+        background: #fdf6d8;
+        border-radius: 7px;
+        padding: 6px 9px;
+      }
+      #drafts-list .draft span { flex: 1; word-break: break-word; }
+      #drafts-list .draft button {
+        border: none; background: none;
+        color: #9ca3af; cursor: pointer;
+        font-size: 13px; padding: 0 2px;
+      }
+      #drafts-list .draft button:hover { color: #dc2626; }
+      #drafts-panel .row { display: flex; gap: 6px; }
+      #drafts-panel .row button {
+        flex: 1;
+        font: inherit; font-size: 12px; font-weight: 500;
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 7px;
+        padding: 6px 0;
+        cursor: pointer;
+      }
+      #drafts-panel .row button:hover { background: #f3f3f1; }
+      #drafts-panel .row button.primary {
+        background: var(--accent); border-color: var(--accent); color: #fff;
+      }
+
+      #sessionbars {
         position: fixed;
         left: 50%; top: 12px;
         transform: translateX(-50%);
         z-index: 12;
+        display: flex;
+        gap: 8px;
+      }
+      #votebar {
         display: none;
         align-items: center;
         gap: 12px;
@@ -183,6 +244,32 @@
         font-size: 13px;
       }
       #votebar.active { display: flex; }
+      #timerbar {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 8px 8px 16px;
+        font-size: 13px;
+      }
+      #timerbar.active { display: flex; }
+      #timerbar .time {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      #timerbar.urgent .time { color: #dc2626; animation: timer-pulse 1s ease infinite; }
+      @keyframes timer-pulse {
+        50% { opacity: 0.45; }
+      }
+      #timerbar button {
+        font: inherit; font-size: 12px; font-weight: 500;
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 7px;
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+      #timerbar button:hover { background: #f3f3f1; }
       #votebar .remaining { font-weight: 600; color: var(--accent); }
       #votebar .dots { display: flex; gap: 4px; }
       #votebar .dots span {
@@ -707,6 +794,8 @@
     </div>
 
     <div id="exportbar" class="panel">
+      <button id="btn-timer" title="Shared timer">Timer</button>
+      <button id="btn-drafts" title="Private drafts — write ideas, reveal together">Drafts</button>
       <button id="btn-vote" title="Dot voting">Vote</button>
       <button id="btn-share" title="Share this board">Share</button>
       <button id="btn-data" title="Board data — \">Data</button>
@@ -737,11 +826,28 @@
 
     <div id="comment-panel" class="panel"></div>
 
-    <div id="votebar" class="panel">
-      <span>Voting</span>
-      <span class="dots" id="vote-dots"></span>
-      <span class="remaining" id="vote-remaining"></span>
-      <button id="vote-end">End voting</button>
+    <div id="drafts-panel" class="panel">
+      <h3>Private drafts</h3>
+      <p class="hint">Only you can see these until you reveal.</p>
+      <input id="draft-input" placeholder="Type an idea, press Enter" />
+      <div id="drafts-list"></div>
+      <div class="row">
+        <button class="primary" id="drafts-reveal">Reveal mine</button>
+        <button id="drafts-reveal-all">Everyone reveal</button>
+      </div>
+    </div>
+
+    <div id="sessionbars">
+      <div id="timerbar" class="panel">
+        <span class="time" id="timer-time">0:00</span>
+        <button id="timer-stop">Stop</button>
+      </div>
+      <div id="votebar" class="panel">
+        <span>Voting</span>
+        <span class="dots" id="vote-dots"></span>
+        <span class="remaining" id="vote-remaining"></span>
+        <button id="vote-end">End voting</button>
+      </div>
     </div>
 
     <div id="toast"></div>

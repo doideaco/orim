@@ -315,6 +315,8 @@ store.subscribe(() => {
   dataPanel.scheduleRefresh();
   comments.refresh();
   updateVoteBar();
+  updateTimerBar();
+  checkRevealAsk();
   reconcileDerived();
 });
 
@@ -1019,6 +1021,203 @@ function rankVotesToTable(): void {
   toast(`Ranked ${rows.length} items into a table, bound to their stickies.`);
   dirty = true;
 }
+
+// --- shared timer ------------------------------------------------------------
+
+interface TimerState { endsAt: number; duration: number; startedBy: string }
+let timerChimed = false;
+
+function updateTimerBar(): void {
+  const timer = store.getMeta<TimerState>("timer");
+  const bar = $("timerbar");
+  if (!timer) {
+    bar.classList.remove("active", "urgent");
+    timerChimed = false;
+    return;
+  }
+  bar.classList.add("active");
+  const left = timer.endsAt - Date.now();
+  const clamped = Math.max(0, Math.ceil(left / 1000));
+  $("timer-time").textContent = `${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, "0")}`;
+  bar.classList.toggle("urgent", left <= 10_000 && left > 0);
+  if (left <= 0) {
+    bar.classList.remove("urgent");
+    $("timer-time").textContent = "Time's up";
+    if (!timerChimed) {
+      timerChimed = true;
+      chime();
+    }
+  }
+}
+setInterval(updateTimerBar, 250);
+
+function chime(): void {
+  try {
+    const ac = new AudioContext();
+    for (const [freq, at] of [[880, 0], [1108.7, 0.18]] as const) {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      gain.gain.setValueAtTime(0.0001, ac.currentTime + at);
+      gain.gain.exponentialRampToValueAtTime(0.12, ac.currentTime + at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + at + 0.5);
+      osc.start(ac.currentTime + at);
+      osc.stop(ac.currentTime + at + 0.55);
+    }
+  } catch { /* audio not allowed yet */ }
+}
+
+$("timer-stop").addEventListener("click", () => store.setMeta("timer", undefined));
+
+$("btn-timer").addEventListener("click", () => {
+  document.querySelector(".dialog-backdrop")?.remove();
+  const backdrop = document.createElement("div");
+  backdrop.className = "dialog-backdrop";
+  backdrop.innerHTML = `
+    <div class="dialog panel" role="dialog">
+      <h3>Shared timer</h3>
+      <p style="margin:0;font-size:13px;color:#6b7280">Everyone on the board sees the countdown.</p>
+      <div class="row" id="timer-presets"></div>
+      <div class="row">
+        <input id="timer-custom" type="number" min="1" max="120" placeholder="Minutes" />
+        <button class="primary" id="timer-go">Start</button>
+      </div>
+    </div>`;
+  const start = (minutes: number) => {
+    store.setMeta("timer", {
+      endsAt: Date.now() + minutes * 60_000,
+      duration: minutes * 60_000,
+      startedBy: me.name,
+    } satisfies TimerState);
+    timerChimed = false;
+    backdrop.remove();
+  };
+  const presets = backdrop.querySelector("#timer-presets")!;
+  for (const m of [1, 2, 5, 10]) {
+    const b = document.createElement("button");
+    b.textContent = `${m} min`;
+    b.addEventListener("click", () => start(m));
+    presets.appendChild(b);
+  }
+  backdrop.querySelector("#timer-go")!.addEventListener("click", () => {
+    const m = Number((backdrop.querySelector("#timer-custom") as HTMLInputElement).value);
+    if (m >= 1) start(Math.min(120, m));
+  });
+  backdrop.addEventListener("pointerdown", (e) => {
+    if (e.target === backdrop) backdrop.remove();
+  });
+  for (const input of backdrop.querySelectorAll("input")) {
+    input.addEventListener("keydown", (e) => e.stopPropagation());
+  }
+  document.body.appendChild(backdrop);
+});
+
+// --- private drafts ----------------------------------------------------------
+
+const DRAFTS_KEY = `orim-drafts-${BOARD}`;
+let lastRevealAsk = 0;
+
+function loadDrafts(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+function saveDrafts(drafts: string[]): void {
+  try {
+    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+  } catch { /* private mode */ }
+  renderDrafts();
+}
+
+function renderDrafts(): void {
+  const drafts = loadDrafts();
+  const list = $("drafts-list");
+  list.replaceChildren();
+  drafts.forEach((text, i) => {
+    const row = document.createElement("div");
+    row.className = "draft";
+    const span = document.createElement("span");
+    span.textContent = text;
+    const del = document.createElement("button");
+    del.textContent = "✕";
+    del.setAttribute("aria-label", "Delete draft");
+    del.addEventListener("click", () => {
+      const next = loadDrafts();
+      next.splice(i, 1);
+      saveDrafts(next);
+    });
+    row.append(span, del);
+    list.appendChild(row);
+  });
+  $("btn-drafts").textContent = drafts.length ? `Drafts · ${drafts.length}` : "Drafts";
+}
+
+function publishDrafts(): void {
+  const drafts = loadDrafts();
+  if (!drafts.length) return;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(drafts.length)));
+  const blockW = cols * 204;
+  const blockH = Math.ceil(drafts.length / cols) * 144;
+  const center = toWorld(camera, { x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  const pos = findEmptySpace([...store.nodes.values()], blockW, blockH, {
+    x: center.x - blockW / 2,
+    y: center.y - blockH / 2,
+  });
+  store.transact(() => {
+    drafts.forEach((text, i) => {
+      store.upsertNode({
+        id: newId(), type: "sticky", parent: null,
+        x: pos.x + (i % cols) * 204,
+        y: pos.y + Math.floor(i / cols) * 144,
+        w: 180, h: 120,
+        rotation: 0, index: store.topIndex(), locked: false,
+        data: { draftedBy: me.name },
+        text, color: defaultColor, author: me.name,
+      });
+    });
+  });
+  saveDrafts([]);
+  toast(`Revealed ${drafts.length} draft${drafts.length === 1 ? "" : "s"}.`);
+  dirty = true;
+}
+
+$("btn-drafts").addEventListener("click", () => {
+  const open = !$("drafts-panel").classList.contains("open");
+  $("drafts-panel").classList.toggle("open", open);
+  $("btn-drafts").classList.toggle("active", open);
+  if (open) ($("draft-input") as HTMLInputElement).focus();
+});
+$("draft-input").addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  const input = e.target as HTMLInputElement;
+  if (e.key === "Enter" && input.value.trim()) {
+    saveDrafts([...loadDrafts(), input.value.trim()]);
+    input.value = "";
+  }
+  if (e.key === "Escape") $("btn-drafts").click();
+});
+$("drafts-reveal").addEventListener("click", publishDrafts);
+$("drafts-reveal-all").addEventListener("click", () => {
+  store.setMeta("revealAsk", { at: Date.now(), by: me.name });
+  toast("Asked everyone to reveal their drafts.");
+});
+
+/** When anyone broadcasts a reveal, clients holding drafts publish them. */
+function checkRevealAsk(): void {
+  const ask = store.getMeta<{ at: number; by: string }>("revealAsk");
+  if (!ask || ask.at <= lastRevealAsk) return;
+  lastRevealAsk = ask.at;
+  if (loadDrafts().length && !readOnly) {
+    publishDrafts();
+    toast(`${ask.by} asked everyone to reveal — your drafts are on the board.`);
+  }
+}
+lastRevealAsk = store.getMeta<{ at: number }>("revealAsk")?.at ?? 0;
+renderDrafts();
 
 // --- export ------------------------------------------------------------------
 
