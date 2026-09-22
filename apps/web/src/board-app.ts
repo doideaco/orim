@@ -27,7 +27,8 @@ import { findEmptySpace, tree } from "@orim/layout";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
-  MessageCircle, type IconNode,
+  MessageCircle, Share2, Presentation, Timer as TimerIcon, EyeOff, Vote,
+  History as HistoryIcon, Database, type IconNode,
 } from "lucide";
 
 // Board id comes from the URL (?b=my-board), so a link IS a share link.
@@ -772,6 +773,18 @@ function ensureOnScreen(n: { x: number; y: number; w: number; h: number }): void
 
 const menuToggle = $("menu-toggle");
 const menuDropdown = $("menu-dropdown");
+const MENU_ICONS: [string, IconNode][] = [
+  ["btn-share", Share2],
+  ["btn-present", Presentation],
+  ["btn-timer", TimerIcon],
+  ["btn-drafts", EyeOff],
+  ["btn-vote", Vote],
+  ["btn-history", HistoryIcon],
+  ["btn-data", Database],
+];
+for (const [id, icon] of MENU_ICONS) {
+  $(id).prepend(createElement(icon, { width: 15, height: 15, "stroke-width": 1.75 }));
+}
 function setMenuOpen(open: boolean): void {
   menuDropdown.hidden = !open;
   menuToggle.setAttribute("aria-expanded", String(open));
@@ -1766,7 +1779,7 @@ function renderDrafts(): void {
     row.append(span, del);
     list.appendChild(row);
   });
-  $("btn-drafts").textContent = drafts.length ? `Drafts · ${drafts.length}` : "Drafts";
+  $("drafts-label").textContent = drafts.length ? `Drafts · ${drafts.length}` : "Drafts";
 }
 
 function publishDrafts(): void {
@@ -1836,7 +1849,7 @@ renderDrafts();
 
 const exportBtn = $("btn-export");
 const exportMenu = $("export-menu");
-exportBtn.prepend(createElement(Download, { width: 15, height: 15, "stroke-width": 2 }));
+exportBtn.prepend(createElement(Download, { width: 15, height: 15, "stroke-width": 1.75 }));
 
 function exportBoard(): ExportBoard {
   return {
