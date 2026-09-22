@@ -567,7 +567,8 @@ export class Renderer {
     ctx.textBaseline = "top";
   }
 
-  /** Label pill at the route's halfway point (by path length). */
+  /** Label pill at the route's halfway point. Short runs can't host a
+   *  pill comfortably, so there the label floats above the line. */
   private connectorLabel(route: Point[], label: string): void {
     const { ctx } = this;
     let total = 0;
@@ -590,18 +591,26 @@ export class Renderer {
       }
       remaining -= lens[i]!;
     }
+
     ctx.font = `500 12px ${FONT_STACK}`;
     const tw = ctx.measureText(label).width;
+    const padX = 10;
+    const h = 24;
+    const w = tw + padX * 2;
+    if (total < w + 44) mid = { x: mid.x, y: mid.y - 20 };
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.16)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 1;
     ctx.fillStyle = "#FFFFFF";
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.10)";
-    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(mid.x - tw / 2 - 6, mid.y - 9, tw + 12, 18, 9);
+    ctx.roundRect(mid.x - w / 2, mid.y - h / 2, w, h, h / 2);
     ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#4B5563";
+    ctx.restore();
+    ctx.fillStyle = "#374151";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, mid.x - tw / 2, mid.y + 1);
+    ctx.fillText(label, mid.x - tw / 2, mid.y + 0.5);
     ctx.textBaseline = "top";
   }
 

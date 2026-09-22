@@ -205,8 +205,10 @@ export function boardToSVG(board: ExportBoard): string {
         remaining -= lens[i]!;
       }
       const tw = c.label.length * 12 * CHAR_W;
-      parts.push(`<rect x="${mid.x - tw / 2 - 6}" y="${mid.y - 9}" width="${tw + 12}" height="18" rx="9" fill="#FFFFFF" stroke="rgba(0,0,0,0.10)" />`);
-      parts.push(`<text x="${mid.x}" y="${mid.y + 4}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="500" fill="#4B5563">${esc(c.label)}</text>`);
+      const w = tw + 20;
+      if (total < w + 44) mid = { x: mid.x, y: mid.y - 20 };
+      parts.push(`<rect x="${mid.x - w / 2}" y="${mid.y - 12}" width="${w}" height="24" rx="12" fill="#FFFFFF" stroke="rgba(0,0,0,0.08)" />`);
+      parts.push(`<text x="${mid.x}" y="${mid.y + 4}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="500" fill="#374151">${esc(c.label)}</text>`);
     }
   }
 
