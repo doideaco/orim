@@ -212,7 +212,7 @@ export async function renderStartPage(): Promise<void> {
       .map((r) => ({ name: r.name, updatedAt: r.at, project: null, count: 0, nodes: [] }));
     if (boards.length) {
       const note = document.createElement("div");
-      note.className = "hint";
+      note.className = "hint offline-note";
       note.textContent = "Sync server offline — showing boards you've opened on this device.";
       grid.before(note);
     }
