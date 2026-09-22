@@ -205,4 +205,7 @@ and honest gap list (comments/roles, format spec site, per-cell CRDT for
 tables, VoiceOver audit). Sample data and the import-inference regression
 check live in [`samples/`](samples/).
 
-License: not yet finalized. The file format and exports will always be open.
+License: the board format, schema and all converters are **MIT**; the
+application is source-available under **FSL-1.1-MIT** (each release
+becomes MIT after two years). Viewing, commenting and exporting your own
+data are never gated. Details in [LICENSING.md](LICENSING.md).
