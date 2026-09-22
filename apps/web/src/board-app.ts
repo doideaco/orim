@@ -1976,7 +1976,7 @@ function frame(): void {
       draftColor: PALETTE[defaultColor].solid,
     });
     overlay.reposition(camera);
-    embeds.sync(src.nodesSorted, camera);
+    embeds.sync(src.nodesSorted, camera, historyStore ? undefined : editor.selection);
     comments.reposition();
     dirty = false;
   }
