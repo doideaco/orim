@@ -52,6 +52,7 @@ async function connect(name: string): Promise<OpenBoard> {
     websocketProvider: sharedSocket(),
     name,
     document,
+    token: process.env.ORIM_TOKEN ?? "guest",
     onSynced: () => markSynced(),
   });
   // With an explicit websocketProvider, v4 requires attaching manually.

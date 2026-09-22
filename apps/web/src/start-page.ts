@@ -6,8 +6,7 @@
 import { PALETTE, CANVAS_BG } from "@orim/renderer";
 import { TEMPLATES } from "@orim/convert";
 import type { PaletteColor } from "@orim/schema";
-
-const API = "http://localhost:1234";
+import { API, authHeaders, authName, openAuthDialog, signOut } from "./auth";
 
 interface BoardInfo {
   name: string;
@@ -82,7 +81,11 @@ export async function renderStartPage(): Promise<void> {
   root.innerHTML = `
     <header>
       <img src="/orim.svg" alt="Orim" />
-      <button id="new-board" class="primary">New board</button>
+      <div class="header-actions">
+        <span id="account-name"></span>
+        <button id="account-btn"></button>
+        <button id="new-board" class="primary">New board</button>
+      </div>
     </header>
     <section>
       <h2>Start from a template</h2>
@@ -98,6 +101,21 @@ export async function renderStartPage(): Promise<void> {
   root.querySelector("#new-board")!.addEventListener("click", () => {
     const name = prompt("Board name");
     if (name !== null) openBoard(slugify(name));
+  });
+
+  const accountBtn = root.querySelector<HTMLButtonElement>("#account-btn")!;
+  const accountName = root.querySelector<HTMLElement>("#account-name")!;
+  const who = authName();
+  accountName.textContent = who ?? "";
+  accountBtn.textContent = who ? "Sign out" : "Sign in";
+  accountBtn.addEventListener("click", () => {
+    if (authName()) {
+      void signOut().then(() => location.reload());
+    } else {
+      void openAuthDialog().then((name) => {
+        if (name) location.reload();
+      });
+    }
   });
 
   const templateRow = root.querySelector("#template-row")!;
@@ -117,7 +135,7 @@ export async function renderStartPage(): Promise<void> {
   const grid = root.querySelector("#board-grid")!;
   let boards: BoardInfo[] = [];
   try {
-    const res = await fetch(`${API}/boards`);
+    const res = await fetch(`${API}/boards`, { headers: authHeaders() });
     boards = (await res.json()) as BoardInfo[];
   } catch {
     boards = recents()
@@ -159,7 +177,11 @@ export async function renderStartPage(): Promise<void> {
       e.stopPropagation();
       const to = prompt("Rename board", info.name);
       if (!to || slugify(to) === info.name) return;
-      await fetch(`${API}/boards/rename?from=${encodeURIComponent(info.name)}&to=${encodeURIComponent(slugify(to))}`, { method: "POST" });
+      const r = await fetch(
+        `${API}/boards/rename?from=${encodeURIComponent(info.name)}&to=${encodeURIComponent(slugify(to))}`,
+        { method: "POST", headers: authHeaders() },
+      );
+      if (!r.ok) alert("Only the board's owner can rename it.");
       location.reload();
     });
     const deleteBtn = document.createElement("button");
@@ -167,7 +189,11 @@ export async function renderStartPage(): Promise<void> {
     deleteBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (!confirm(`Delete "${info.name}"? This can't be undone.`)) return;
-      await fetch(`${API}/boards?name=${encodeURIComponent(info.name)}`, { method: "DELETE" });
+      const r = await fetch(`${API}/boards?name=${encodeURIComponent(info.name)}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!r.ok) alert("Only the board's owner can delete it.");
       try {
         indexedDB.deleteDatabase(`orim-${info.name}`);
       } catch { /* best effort */ }

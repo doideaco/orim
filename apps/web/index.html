@@ -156,6 +156,7 @@
         padding: 4px;
         display: flex; gap: 2px;
       }
+      #btn-share,
       #btn-data,
       #btn-export {
         display: flex; align-items: center; gap: 7px;
@@ -166,7 +167,7 @@
         cursor: pointer;
         color: #40444f;
       }
-      #btn-export:hover, #btn-data:hover { background: rgba(0, 0, 0, 0.06); }
+      #btn-export:hover, #btn-data:hover, #btn-share:hover { background: rgba(0, 0, 0, 0.06); }
       #btn-data.active { background: var(--accent); color: #fff; }
 
       #datapanel {
@@ -334,6 +335,17 @@
         margin-bottom: 40px;
       }
       #start header img { height: 26px; }
+      #start .header-actions { display: flex; align-items: center; gap: 10px; }
+      #start #account-name { font-size: 13px; color: #6b7280; }
+      #start #account-btn {
+        font: inherit; font-size: 13px;
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 9px;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      #start #account-btn:hover { background: #f3f3f1; }
       #start .primary {
         font: inherit; font-size: 13.5px; font-weight: 500;
         background: var(--accent); color: #fff;
@@ -451,6 +463,95 @@
       }
       #comment-panel .actions button:last-child { margin-left: auto; }
 
+      /* --- tooltips --- */
+      [data-tip] { position: relative; }
+      [data-tip]::after {
+        content: attr(data-tip);
+        position: absolute;
+        top: calc(100% + 8px); left: 50%;
+        transform: translateX(-50%);
+        background: #1f2430;
+        color: #f4f4f2;
+        font-size: 11.5px; font-weight: 500;
+        padding: 4px 9px;
+        border-radius: 6px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s ease 0.4s;
+        z-index: 60;
+      }
+      [data-tip]:hover::after { opacity: 1; }
+      [data-tip][data-tip-at="right"]::after {
+        top: 50%; left: calc(100% + 10px);
+        transform: translateY(-50%);
+      }
+      [data-tip][data-tip-at="top"]::after {
+        top: auto; bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      /* --- dialogs (auth, share) --- */
+      #auth-dialog-backdrop, #share-backdrop {
+        position: fixed; inset: 0;
+        z-index: 50;
+        background: rgba(31, 36, 48, 0.35);
+        display: grid; place-items: center;
+      }
+      .dialog {
+        width: 340px;
+        padding: 20px;
+        display: flex; flex-direction: column; gap: 10px;
+        border-radius: 14px;
+      }
+      .dialog h3 { margin: 0 0 2px; font-size: 15px; }
+      .dialog h4 {
+        margin: 8px 0 0;
+        font-size: 10.5px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: #9ca3af;
+      }
+      .dialog input, .dialog select {
+        font: inherit; font-size: 13px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fff; color: var(--ink);
+      }
+      .dialog input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+      .dialog .row { display: flex; gap: 8px; align-items: center; }
+      .dialog .row input { flex: 1; }
+      .dialog button {
+        font: inherit; font-size: 13px;
+        border: 1px solid var(--border);
+        background: #fff; color: var(--ink);
+        border-radius: 8px;
+        padding: 7px 14px;
+        cursor: pointer;
+      }
+      .dialog button:hover { background: #f3f3f1; }
+      .dialog button.primary {
+        background: var(--accent); border-color: var(--accent); color: #fff;
+      }
+      .dialog button.link {
+        border: none; background: none;
+        color: var(--accent); font-size: 12px;
+        padding: 0; align-self: flex-start;
+      }
+      .dialog .err { color: #dc2626; font-size: 12px; min-height: 15px; }
+      .dialog label.radio {
+        display: flex; gap: 8px; align-items: baseline;
+        font-size: 13px; cursor: pointer;
+      }
+      .dialog label.radio span.sub { display: block; font-size: 11.5px; color: #9ca3af; }
+      .dialog .share-row {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 13px;
+      }
+      .dialog .share-row span { flex: 1; }
+      .dialog .share-row select { padding: 4px 6px; font-size: 12px; }
+
       #toast {
         position: fixed;
         left: 50%; bottom: 28px;
@@ -549,8 +650,9 @@
     </div>
 
     <div id="exportbar" class="panel">
+      <button id="btn-share" title="Share this board">Share</button>
       <button id="btn-data" title="Board data — \">Data</button>
-      <button id="btn-export">Export</button>
+      <button id="btn-export" title="Export the board">Export</button>
     </div>
 
     <div id="datapanel" class="panel">

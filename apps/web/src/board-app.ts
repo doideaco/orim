@@ -19,6 +19,7 @@ import { DataPanel } from "./data-panel";
 import { A11yMirror } from "./a11y-mirror";
 import { ORIM_CLIP_MARKER, setupFileDrop, setupPaste } from "./import-drop";
 import { CommentsUI } from "./comments-ui";
+import { api, authName, authToken, openAuthDialog } from "./auth";
 import {
   createElement, MousePointer2, Hand, StickyNote, Square, Circle, Diamond,
   Type, Frame, MoveUpRight, Pencil, Download, Table, RectangleHorizontal,
@@ -211,6 +212,7 @@ function toast(message: string, isError = false): void {
 
 const importDeps = {
   store, editor, camera, newId,
+  canEdit: () => !readOnly,
   onDone: (summary: string) => {
     toast(summary);
     dirty = true;
@@ -222,7 +224,7 @@ setupFileDrop(importDeps);
 setupPaste({
   ...importDeps,
   isEditing: () => {
-    if (overlay.activeId) return true;
+    if (readOnly || overlay.activeId) return true;
     const t = document.activeElement;
     return (
       t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement ||
@@ -242,6 +244,13 @@ const provider = new HocuspocusProvider({
   url: "ws://localhost:1234",
   name: BOARD,
   document: doc,
+  token: authToken(),
+  onAuthenticationFailed: () => {
+    toast("This board is private — sign in with an account that has access.", true);
+    $("stat-conn").textContent = "no access";
+    $("status-dot").classList.remove("connected");
+    if (!readOnly) enterReadOnly("Private board — your cached copy, view only");
+  },
   onStatus: ({ status }) => {
     $("stat-conn").textContent = status === "connected" ? "synced" : status;
     $("status-dot").classList.toggle("connected", status === "connected");
@@ -279,7 +288,7 @@ function maybeSeedTemplate(): void {
 }
 
 const me = {
-  name: `Guest-${Math.floor(Math.random() * 900 + 100)}`,
+  name: authName() ?? `Guest-${Math.floor(Math.random() * 900 + 100)}`,
   color: CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)]!,
 };
 const awareness = provider.awareness;
@@ -366,7 +375,7 @@ const info = (e: PointerEvent | MouseEvent) => ({
 
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 && e.button !== 1) return;
-  if (editor.tool === "select") {
+  if (editor.tool === "select" || editor.tool === "hand") {
     const pin = comments.pinAt({ x: e.clientX, y: e.clientY });
     if (pin) {
       comments.open(pin.id);
@@ -401,6 +410,7 @@ canvas.addEventListener("pointerup", (e) => {
 });
 
 canvas.addEventListener("dblclick", (e) => {
+  if (readOnly) return;
   editor.dblClick(info(e));
   dirty = true;
 });
@@ -437,6 +447,8 @@ window.addEventListener("keydown", (e) => {
   }
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key.toLowerCase();
+
+  if (readOnly && !["1", "0", "\\"].includes(key)) return;
 
   if (mod) {
     if (key === "z") {
@@ -517,9 +529,16 @@ function syncToolbar(): void {
   }
 }
 
-// Buttons that only show an icon or a glyph still need a name.
-for (const btn of document.querySelectorAll<HTMLElement>("button[title]")) {
-  if (!btn.getAttribute("aria-label")) btn.setAttribute("aria-label", btn.title);
+// Custom tooltips: every titled button gets a styled tip (placement by
+// container) plus an aria-label; the native title tooltip is removed.
+function setupTooltips(): void {
+  for (const btn of document.querySelectorAll<HTMLElement>("button[title]")) {
+    if (!btn.getAttribute("aria-label")) btn.setAttribute("aria-label", btn.title);
+    btn.dataset.tip = btn.title;
+    if (btn.closest("#toolbar")) btn.dataset.tipAt = "right";
+    else if (btn.closest("#zoombar") || btn.closest("#color-popover")) btn.dataset.tipAt = "top";
+    btn.removeAttribute("title");
+  }
 }
 
 // One swatch shows the active fill + stroke; clicking opens the popover.
@@ -618,6 +637,197 @@ window.addEventListener("pointerdown", (e) => {
 });
 
 refreshSwatchUI();
+
+// --- access & sharing --------------------------------------------------------
+
+const bareBoard = BOARD.replace(/^orim-/, "");
+let readOnly = false;
+interface AccessInfo { role: string; mode: string; ownerName: string | null }
+let access: AccessInfo = { role: "editor", mode: "link-edit", ownerName: null };
+
+async function refreshAccess(): Promise<void> {
+  try {
+    access = await api<AccessInfo>(
+      "GET",
+      `/boards/access?board=${encodeURIComponent(bareBoard)}`,
+    );
+    if (access.role === "viewer" && !readOnly) enterReadOnly();
+    if (access.role === "none" && !readOnly) {
+      enterReadOnly("Private board — your cached copy, view only");
+    }
+  } catch { /* server offline → local-first editing */ }
+}
+
+function enterReadOnly(label = "View only"): void {
+  readOnly = true;
+  comments.readOnly = true;
+  $("toolbar").style.display = "none";
+  editor.tool = "hand";
+  editor.clearSelection();
+  const chip = document.createElement("div");
+  chip.className = "panel";
+  chip.textContent = label;
+  chip.style.cssText =
+    "position:fixed;left:50%;top:12px;transform:translateX(-50%);padding:6px 14px;font-size:12px;color:#6b7280;z-index:10;";
+  document.body.appendChild(chip);
+  dirty = true;
+}
+void refreshAccess();
+
+$("btn-share").addEventListener("click", () => void openShareDialog());
+
+async function openShareDialog(): Promise<void> {
+  await refreshAccess();
+  document.getElementById("share-backdrop")?.remove();
+  const backdrop = document.createElement("div");
+  backdrop.id = "share-backdrop";
+  const canManage = access.role === "owner" || access.ownerName === null;
+  const link = `${location.origin}/?b=${encodeURIComponent(bareBoard)}`;
+  backdrop.innerHTML = `
+    <div class="dialog panel" role="dialog" aria-label="Share board">
+      <h3>Share "${bareBoard}"</h3>
+      <div class="row">
+        <input id="share-link" readonly value="${link}" />
+        <button id="share-copy">Copy</button>
+      </div>
+      <h4>Access</h4>
+      <div id="share-modes"></div>
+      <div class="err" id="share-owner-note"></div>
+      <div id="share-people"></div>
+      <div class="err" id="share-err"></div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  const q = (id: string) => backdrop.querySelector<HTMLElement>(`#${id}`)!;
+
+  q("share-copy").addEventListener("click", () => {
+    void navigator.clipboard?.writeText(link);
+    q("share-copy").textContent = "Copied";
+  });
+
+  const ownerNote = q("share-owner-note");
+  ownerNote.style.color = "#9ca3af";
+  const renderOwnerNote = () => {
+    ownerNote.textContent = access.ownerName
+      ? `Owned by ${access.ownerName}`
+      : authName()
+        ? "Unowned — changing access makes you the owner."
+        : "Sign in below to own and restrict this board.";
+  };
+  renderOwnerNote();
+
+  const MODES: [string, string, string][] = [
+    ["link-edit", "Anyone with the link can edit", "The default for quick collaboration"],
+    ["link-view", "Anyone with the link can view", "Others watch; people you add can edit"],
+    ["private", "Private", "Only people you add below"],
+  ];
+  const modesEl = q("share-modes");
+  for (const [value, label, sub] of MODES) {
+    const row = document.createElement("label");
+    row.className = "radio";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "share-mode";
+    radio.value = value;
+    radio.checked = access.mode === value;
+    radio.disabled = !canManage;
+    const text = document.createElement("span");
+    text.textContent = label;
+    const subEl = document.createElement("span");
+    subEl.className = "sub";
+    subEl.textContent = sub;
+    text.appendChild(subEl);
+    row.append(radio, text);
+    radio.addEventListener("change", () => {
+      void (async () => {
+        try {
+          access = await api<AccessInfo>("POST", "/boards/share", { board: bareBoard, mode: value });
+          q("share-err").textContent = "";
+          renderOwnerNote();
+        } catch (err) {
+          q("share-err").textContent = err instanceof Error ? err.message : String(err);
+          await openShareDialog();
+        }
+      })();
+    });
+    modesEl.appendChild(row);
+  }
+
+  const people = q("share-people");
+  if (!authName()) {
+    const btn = document.createElement("button");
+    btn.textContent = "Sign in";
+    btn.addEventListener("click", () => {
+      void openAuthDialog().then((name) => {
+        if (name) location.reload();
+      });
+    });
+    people.appendChild(btn);
+  } else if (canManage) {
+    const h = document.createElement("h4");
+    h.textContent = "People";
+    people.appendChild(h);
+    try {
+      const grants = await api<{ name: string; role: string }[]>(
+        "GET",
+        `/boards/shares?board=${encodeURIComponent(bareBoard)}`,
+      );
+      for (const g of grants) {
+        const row = document.createElement("div");
+        row.className = "share-row";
+        const nameEl = document.createElement("span");
+        nameEl.textContent = g.name;
+        const sel = document.createElement("select");
+        for (const r of ["editor", "viewer", "none"]) {
+          const opt = document.createElement("option");
+          opt.value = r;
+          opt.textContent = r === "none" ? "remove" : `can ${r === "editor" ? "edit" : "view"}`;
+          opt.selected = g.role === r;
+          sel.appendChild(opt);
+        }
+        sel.addEventListener("change", () => {
+          void api("POST", "/boards/grant", { board: bareBoard, name: g.name, role: sel.value })
+            .then(() => openShareDialog())
+            .catch((err) => (q("share-err").textContent = String(err.message ?? err)));
+        });
+        row.append(nameEl, sel);
+        people.appendChild(row);
+      }
+    } catch { /* shares unavailable */ }
+    const addRow = document.createElement("div");
+    addRow.className = "row";
+    const nameInput = document.createElement("input");
+    nameInput.placeholder = "Add person by name";
+    const roleSel = document.createElement("select");
+    for (const r of ["editor", "viewer"]) {
+      const opt = document.createElement("option");
+      opt.value = r;
+      opt.textContent = `can ${r === "editor" ? "edit" : "view"}`;
+      roleSel.appendChild(opt);
+    }
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "Add";
+    addBtn.addEventListener("click", () => {
+      if (!nameInput.value.trim()) return;
+      void api("POST", "/boards/grant", {
+        board: bareBoard, name: nameInput.value.trim(), role: roleSel.value,
+      })
+        .then(() => openShareDialog())
+        .catch((err) => (q("share-err").textContent = String(err.message ?? err)));
+    });
+    addRow.append(nameInput, roleSel, addBtn);
+    people.appendChild(addRow);
+  }
+
+  backdrop.addEventListener("pointerdown", (e) => {
+    if (e.target === backdrop) backdrop.remove();
+  });
+  for (const input of backdrop.querySelectorAll("input")) {
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") backdrop.remove();
+    });
+  }
+}
 
 // --- export ------------------------------------------------------------------
 
@@ -787,6 +997,7 @@ function frame(): void {
 }
 
 syncToolbar();
+setupTooltips();
 requestAnimationFrame(frame);
 
 // Debug handle for verification (not part of the product surface).

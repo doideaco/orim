@@ -19,6 +19,7 @@ interface DropDeps {
   editor: Editor;
   camera: Camera;
   newId(): string;
+  canEdit(): boolean;
   onDone(summary: string): void;
   onError(message: string): void;
 }
@@ -80,7 +81,7 @@ export function setupFileDrop(deps: DropDeps): void {
 
   window.addEventListener("drop", (e) => {
     const file = e.dataTransfer?.files?.[0];
-    if (!file) return;
+    if (!file || !deps.canEdit()) return;
     e.preventDefault();
     const origin = toWorld(camera, { x: e.clientX, y: e.clientY });
     void (async () => {

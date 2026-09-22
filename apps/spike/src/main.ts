@@ -32,6 +32,7 @@ const provider = new HocuspocusProvider({
   url: "ws://localhost:1234",
   name: "orim-spike",
   document: doc,
+  token: "guest",
   onStatus: ({ status }) => {
     $("stat-conn").textContent = status;
     $("status-dot").classList.toggle("connected", status === "connected");

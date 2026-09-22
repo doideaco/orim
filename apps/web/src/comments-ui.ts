@@ -21,6 +21,8 @@ const timeAgo = (at: number): string => {
 
 export class CommentsUI {
   activeId: string | null = null;
+  /** Viewers can read threads but not write. */
+  readOnly = false;
   private panel: HTMLElement;
   private pendingAnchor: BoardComment["anchor"] | null = null;
   /** The click that opens the panel also bubbles to window; skip it. */
@@ -142,6 +144,8 @@ export class CommentsUI {
       this.panel.appendChild(thread);
     }
 
+    if (this.readOnly) return;
+
     const box = document.createElement("textarea");
     box.placeholder = comment ? "Reply…" : "Add a comment…";
     box.rows = 2;
@@ -186,7 +190,7 @@ export class CommentsUI {
 
   private submit(body: string): void {
     const text = body.trim();
-    if (!text) return;
+    if (!text || this.readOnly) return;
     if (this.activeId) {
       const c = this.store.getComment(this.activeId);
       if (c) {
