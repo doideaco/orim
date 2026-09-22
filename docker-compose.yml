@@ -18,6 +18,10 @@ services:
       # ORIM_OIDC_CLIENT_ID: orim
       # ORIM_OIDC_CLIENT_SECRET: change-me
       # ORIM_OIDC_REQUIRED: "1"   # disable password auth entirely
+      # Behind a reverse proxy, key rate limits on the real client IP:
+      # ORIM_TRUST_PROXY: "1"
+      # Allow other origins to call the API (default: same-origin only):
+      # ORIM_CORS_ORIGINS: https://tools.internal.example
       {}
     restart: unless-stopped
 

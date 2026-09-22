@@ -48,6 +48,11 @@ Encrypt at rest via your volume/filesystem encryption (LUKS, EBS, etc.).
   discovery, authorization redirect, token exchange, live JWKS signature
   verification, and audit logging — is verified end-to-end against
   Keycloak 26.
+- **Rate limiting**: auth endpoints (login, signup, OIDC) are limited
+  per client IP (default 30 attempts per 10 minutes,
+  `ORIM_AUTH_RATE_LIMIT`); crossing the limit is recorded in the audit
+  log. Behind a reverse proxy, set `ORIM_TRUST_PROXY=1` so the limit
+  keys on `X-Forwarded-For` instead of the proxy's address.
 
 ## Authorization
 
@@ -72,6 +77,10 @@ directly from SQLite for SIEM ingestion.
   HTTPS origin (SSO redirects depend on it).
 - Set `ORIM_OIDC_REQUIRED=1` so all identity flows through your IdP.
 - Shorten `ORIM_SESSION_TTL_HOURS` to your policy (e.g. 12).
+- Cross-origin API access is denied by default in the container
+  (same-origin only); if another origin legitimately needs the API,
+  list it in `ORIM_CORS_ORIGINS`. Set `ORIM_TRUST_PROXY=1` behind your
+  reverse proxy so rate limiting sees real client IPs.
 - Run the container read-only except `/data`; it runs as a non-root
   user by default.
 - Back up `/data` on your normal schedule; test restore (it's one file).
@@ -82,10 +91,6 @@ directly from SQLite for SIEM ingestion.
 - Local-first means revoked users retain their previously-synced local
   copy (clearly labelled read-only in the UI); revocation stops all
   future access and updates, like revoking a file share.
-- CORS is currently open (`*`) on the HTTP API — same-origin deployment
-  behind your proxy is the intended posture; a configurable allow-list
-  is planned.
-- No rate limiting yet on auth endpoints — enforce at the proxy for now.
 - MCP server connections authenticate as guest by default; set
   `ORIM_TOKEN` to a real session token to run agents as a user.
 

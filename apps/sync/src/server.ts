@@ -79,6 +79,58 @@ const oidc = oidcConfig();
 const webDist = process.env.ORIM_WEB_DIST ?? "";
 const SESSION_TTL =
   Number(process.env.ORIM_SESSION_TTL_HOURS ?? 24 * 30) * 3600_000;
+
+/**
+ * CORS allow-list. Default: same-origin only when serving the web app
+ * (single-container production), open when running API-only (local dev,
+ * where the Vite server is a different origin). `ORIM_CORS_ORIGINS`
+ * overrides with `*` or a comma-separated origin list.
+ */
+const corsOrigins = (process.env.ORIM_CORS_ORIGINS ?? (webDist ? "" : "*")).trim();
+const corsAllowed = corsOrigins.split(",").map((s) => s.trim()).filter(Boolean);
+function corsHeaders(origin: string | undefined): Record<string, string> {
+  if (!corsOrigins) return {};
+  const allow = corsOrigins === "*" ? "*" : origin && corsAllowed.includes(origin) ? origin : null;
+  if (!allow) return {};
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    ...(allow === "*" ? {} : { Vary: "Origin" }),
+  };
+}
+
+/**
+ * Per-IP fixed-window rate limit for auth endpoints (credential guessing,
+ * signup spam, OIDC state churn). In-memory: resets on restart, which is
+ * fine for a brute-force brake.
+ */
+const RATE_LIMIT = Number(process.env.ORIM_AUTH_RATE_LIMIT ?? 30);
+const RATE_WINDOW_MS = 10 * 60_000;
+const trustProxy = process.env.ORIM_TRUST_PROXY === "1";
+const rateHits = new Map<string, { count: number; resetAt: number }>();
+function rateLimited(request: IncomingMessage): boolean {
+  const fwd = trustProxy ? request.headers["x-forwarded-for"] : undefined;
+  const ip =
+    (typeof fwd === "string" ? fwd.split(",")[0]?.trim() : "") ||
+    request.socket?.remoteAddress ||
+    "?";
+  const now = Date.now();
+  if (rateHits.size > 10_000) {
+    for (const [k, v] of rateHits) if (now > v.resetAt) rateHits.delete(k);
+  }
+  let entry = rateHits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + RATE_WINDOW_MS };
+    rateHits.set(ip, entry);
+  }
+  entry.count += 1;
+  if (entry.count === RATE_LIMIT + 1) audit(ip, "auth.ratelimited");
+  return entry.count > RATE_LIMIT;
+}
+const RATE_LIMITED_PATHS = new Set([
+  "/auth/login", "/auth/signup", "/auth/oidc/login", "/auth/oidc/callback",
+]);
 const selectStmt = db.prepare("SELECT state FROM boards WHERE name = ?");
 const upsertStmt = db.prepare(`
   INSERT INTO boards (name, state, updated_at) VALUES (?, ?, ?)
@@ -232,15 +284,13 @@ const server = new Server({
     return { user: user?.name ?? "guest", role: access.role };
   },
 
-  // Minimal HTTP API for the start page and share dialog. CORS-open.
+  // Minimal HTTP API for the start page and share dialog.
   async onRequest({ request, response }) {
     const url = new URL(request.url ?? "/", "http://localhost");
     const send = (status: number, body: unknown) => {
       response.writeHead(status, {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        ...corsHeaders(request.headers.origin),
       });
       response.end(JSON.stringify(body));
       // Hocuspocus contract: an EMPTY rejection short-circuits later hooks
@@ -268,6 +318,9 @@ const server = new Server({
       return Promise.resolve();
     }
     if (request.method === "OPTIONS") return send(204, {});
+    if (RATE_LIMITED_PATHS.has(url.pathname) && rateLimited(request)) {
+      return send(429, { error: "Too many attempts — try again in a few minutes." });
+    }
 
     const user = userForToken(bearer(request));
 

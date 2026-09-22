@@ -33,10 +33,17 @@ ORIM_WEB_DIST=$PWD/apps/web/dist ORIM_DATA_DIR=/var/lib/orim \
 | `ORIM_WEB_DIST` | set in container | Built web app to serve; unset = API/sync only |
 | `ORIM_PUBLIC_URL` | `http://localhost:1234` | Public origin (needed for SSO redirects) |
 | `ORIM_SESSION_TTL_HOURS` | `720` | Session lifetime |
+| `ORIM_CORS_ORIGINS` | same-origin¹ | CORS allow-list: `*` or comma-separated origins |
+| `ORIM_AUTH_RATE_LIMIT` | `30` | Max auth attempts per IP per 10 minutes |
+| `ORIM_TRUST_PROXY` | – | `1` reads client IP from `X-Forwarded-For` (set behind a proxy) |
 | `ORIM_OIDC_ISSUER` | – | OIDC issuer URL (enables SSO) |
 | `ORIM_OIDC_CLIENT_ID` | – | OIDC client id |
 | `ORIM_OIDC_CLIENT_SECRET` | – | OIDC client secret |
 | `ORIM_OIDC_REQUIRED` | – | `1` disables password auth (SSO only) |
+
+¹ When `ORIM_WEB_DIST` is set (the container default) no cross-origin
+requests are allowed unless you list origins; when running API-only (dev)
+the default is `*`.
 
 Register the OIDC client with redirect URI
 `{ORIM_PUBLIC_URL}/auth/oidc/callback` (authorization code flow).
