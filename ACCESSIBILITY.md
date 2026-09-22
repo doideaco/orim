@@ -24,11 +24,12 @@ as gaps close.
   collapse and expand, Home/End jump, Enter edits text in place (a real
   contenteditable), Delete removes objects. Selection follows focus and
   the camera moves to the focused object.
-- **Keyboard on the canvas itself**: tree diagrams (org charts, mind
-  maps) are navigable in place — arrow keys move between parent,
-  children and siblings, Tab adds a connected child, Enter a sibling —
-  so structured diagrams can be both read and *authored* without a
-  pointer.
+- **Keyboard on the canvas itself**: arrow keys nudge the selection
+  (Shift for a larger step; frames carry their contents). Tree diagrams
+  (org charts, mind maps) are navigable in place — arrows move between
+  parent, children and siblings (Alt+arrows nudge instead), Tab adds a
+  connected child, Enter a sibling — so structured diagrams can be
+  read, *authored and arranged* without a pointer.
 - **Live announcements**: additions, removals and edits — including
   collaborators' and AI agents' — are announced via a polite live
   region.
@@ -43,8 +44,8 @@ as gaps close.
   selection change.
 - No visible focus ring for sighted keyboard users driving the tree.
 - No reduced-motion / high-contrast modes yet.
-- Canvas drag interactions (move/resize/draw) have no keyboard
-  equivalent yet; creation and text editing do.
+- Resizing and freehand drawing have no keyboard equivalent yet;
+  creation, moving (arrow-key nudge) and text editing do.
 - Formal screen-reader test passes (VoiceOver/NVDA/JAWS) are pending;
   conformance so far is verified against the browser accessibility tree.
 

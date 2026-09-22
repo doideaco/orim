@@ -723,6 +723,31 @@ function addTreeChild(parentId: string): void {
   dataPanel.scheduleRefresh();
 }
 
+/** Move the selection by a keyboard nudge; frames carry their children. */
+function nudgeSelection(dx: number, dy: number): void {
+  if (readOnly || !editor.selection.size) return;
+  const ids = new Set<string>();
+  const add = (id: string) => {
+    if (ids.has(id)) return;
+    ids.add(id);
+    const n = store.getNode(id);
+    if (n?.type === "frame") {
+      for (const child of store.nodes.values()) {
+        if (child.parent === id) add(child.id);
+      }
+    }
+  };
+  for (const id of editor.selection) add(id);
+  store.transact(() => {
+    for (const id of ids) {
+      const n = store.getNode(id);
+      if (n && !n.locked) store.updateNode(id, { x: n.x + dx, y: n.y + dy });
+    }
+  });
+  dirty = true;
+  dataPanel.scheduleRefresh();
+}
+
 /** Nudge the camera the minimal amount to keep a node in view. */
 function ensureOnScreen(n: { x: number; y: number; w: number; h: number }): void {
   const M = 72;
@@ -1039,7 +1064,22 @@ window.addEventListener("keydown", (e) => {
       addTreeChild(parentEdge.from.node);
     }
   } else if (e.key.startsWith("Arrow")) {
-    if (navigateTree(e.key)) e.preventDefault();
+    // Plain arrows navigate a tree when a single tree node is selected;
+    // otherwise they nudge the selection (Shift = big step). Alt always
+    // nudges, so tree nodes can be moved from the keyboard too.
+    const treeNav = !e.altKey && !e.shiftKey && navigateTree(e.key);
+    if (treeNav) {
+      e.preventDefault();
+    } else if (editor.selection.size) {
+      e.preventDefault();
+      const step = e.shiftKey ? 32 : 8;
+      const deltas: Record<string, [number, number]> = {
+        ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+        ArrowUp: [0, -step], ArrowDown: [0, step],
+      };
+      const delta = deltas[e.key];
+      if (delta) nudgeSelection(delta[0], delta[1]);
+    }
   } else if (e.key === "Escape") {
     embeds.activate(null);
     editor.clearSelection();
