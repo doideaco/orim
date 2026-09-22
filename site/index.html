@@ -393,6 +393,12 @@ browser ── HTTPS/WSS (your proxy) ──► <b>orim</b>
         with guardrails like "never zero admins" enforced server-side.</p>
       </div>
       <div class="card">
+        <h3>Append-only board history</h3>
+        <p>Every board keeps version snapshots — automatic and labelled.
+        Time-travel is read-only, restores are ordinary synced edits, and
+        the audit log records who rolled back, and to when.</p>
+      </div>
+      <div class="card">
         <h3>Enforced at the sync layer</h3>
         <p>Per-board access modes and roles are checked where the data
         moves: viewer connections are read-only server-side and private
@@ -426,8 +432,8 @@ browser ── HTTPS/WSS (your proxy) ──► <b>orim</b>
       <div class="sticky yellow">
         <h3>Drop a spreadsheet, get a diagram</h3>
         <p>CSV or Excel onto the canvas → a laid-out org chart, dependency
-        graph, kanban or table. Paste Mermaid or Markdown and it builds
-        the diagram too.</p>
+        graph, kanban or table. Then Tab adds children, Enter siblings —
+        the tree rebalances itself.</p>
       </div>
       <div class="sticky blue">
         <h3>Exports that don't lie</h3>
@@ -455,9 +461,21 @@ browser ── HTTPS/WSS (your proxy) ──► <b>orim</b>
       </div>
       <div class="sticky yellow">
         <h3>Workshops built in</h3>
-        <p>Dot voting with budgets, a shared timer, and private drafting
-        with a broadcast reveal — the facilitation basics without another
-        tool.</p>
+        <p>Dot voting with budgets, a shared timer, private drafting with
+        a broadcast reveal — then present mode turns your frames into
+        slides for the readout.</p>
+      </div>
+      <div class="sticky green">
+        <h3>Linked tables</h3>
+        <p>Point a table at a CSV URL — a published sheet, an internal
+        export — behind your allow-list. Refreshes keep bindings and
+        totals intact.</p>
+      </div>
+      <div class="sticky pink">
+        <h3>The web, on the board</h3>
+        <p>Drop a URL and get a live, resizable site you can scroll and
+        click. Drop or paste images too — everything stays in the
+        document.</p>
       </div>
     </div>
   </div>
@@ -483,6 +501,7 @@ browser ── HTTPS/WSS (your proxy) ──► <b>orim</b>
           <tr><td>Screen-reader navigable boards</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
           <tr><td>Native MCP for agents</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
           <tr><td>Works offline</td><td class="yes">Local-first</td><td class="no">Limited</td><td class="no">No</td><td class="no">No</td></tr>
+          <tr><td>Version history on your infrastructure</td><td class="yes">Append-only</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
           <tr><td>Pricing model</td><td class="yes">Per server</td><td class="no">Per seat</td><td class="no">Per seat</td><td class="no">Per seat</td></tr>
         </tbody>
       </table>
