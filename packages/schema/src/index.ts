@@ -133,13 +133,15 @@ export type InkNode = z.infer<typeof InkNode>;
 // ---------------------------------------------------------------------------
 
 /** An endpoint is either bound to a node (follows it) or a free point.
- *  Binding to a table may name a row: the connector then anchors to that
- *  row's edge, not the table as a whole. */
+ *  Binding to a table may name a row (the connector anchors to that row's
+ *  edge) and a column — a precise cell, used when a drop on a cell turns
+ *  into a `$source` binding instead of a connector. */
 export const Endpoint = z.union([
   z.object({
     node: NodeId,
     anchor: z.enum(["auto", "n", "s", "e", "w"]).default("auto"),
     row: z.string().optional(),
+    column: z.string().optional(),
   }),
   z.object({ point: Vec }),
 ]);

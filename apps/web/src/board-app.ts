@@ -85,8 +85,45 @@ const editor = new Editor(store, camera, {
   },
   openFieldEditor: (node, key) => openFieldChipEditor(node, key),
   addTreeChild: (parentId) => addTreeChild(parentId),
+  bindNodeToCell: (req) => bindNodeToCell(req),
   openTextEditor: (node) => openNodeTextEditor(node),
 });
+
+/**
+ * Bind a text-bearing node to one table cell: the cell becomes the
+ * source of truth for the node's text. An empty cell first adopts the
+ * node's current text, so linking never loses work.
+ */
+function bindNodeToCell(req: {
+  nodeId: string; tableId: string; rowId: string; columnId: string;
+}): boolean {
+  if (readOnly) return false;
+  const node = store.getNode(req.nodeId);
+  const table = store.getNode(req.tableId);
+  if (!node || !("text" in node) || table?.type !== "table") return false;
+  const row = table.rows.find((r) => r.id === req.rowId);
+  const col = table.columns.find((c) => c.id === req.columnId);
+  if (!row || !col) return false;
+
+  const cellText = row.cells[col.id] ?? "";
+  store.transact(() => {
+    if (!cellText && node.text) {
+      store.updateNode(table.id, {
+        rows: table.rows.map((r) =>
+          r.id === row.id ? { ...r, cells: { ...r.cells, [col.id]: node.text } } : r,
+        ),
+      });
+    }
+    store.updateNode(node.id, {
+      data: { ...node.data, $source: { table: table.id, row: row.id, column: col.id } },
+    });
+  });
+  reconcileDerived();
+  toast(`Linked to “${col.name}” — the cell is now the source of truth`);
+  dirty = true;
+  dataPanel.scheduleRefresh();
+  return true;
+}
 
 function openNodeTextEditor(node: import("@orim/schema").Node): void {
   if (node.type === "frame") {
@@ -1625,6 +1662,7 @@ function frame(): void {
         editor.tool === "select" || editor.tool === "connector"
           ? editor.hoveredId ?? editor.singleSelectedNode()?.id ?? null
           : null,
+      bindCell: editor.draftBindCell,
       treePlusFor: (() => {
         if (readOnly || editor.tool !== "select") return null;
         const n = editor.singleSelectedNode();

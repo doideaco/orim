@@ -30,6 +30,12 @@ export interface EditorHooks {
   openFieldEditor(node: Node, key: string): void;
   /** Add a child node under `parentId` in a tree diagram (Tab / "+"). */
   addTreeChild(parentId: string): void;
+  /** A connector was dropped on a table cell from a text-bearing node:
+   *  bind the node to that cell instead of creating a connector.
+   *  Return false to fall back to a plain connector. */
+  bindNodeToCell(req: {
+    nodeId: string; tableId: string; rowId: string; columnId: string;
+  }): boolean;
   defaultColor(): PaletteColor;
   defaultFillStyle(): ShapeNode["fillStyle"];
 }
@@ -71,6 +77,8 @@ export class Editor {
   marquee: Rect | null = null;
   draftRect: Rect | null = null; // shape/frame being dragged out
   draftConnector: { from: Point; to: Point } | null = null;
+  /** Cell a connector drop would bind to (highlighted while dragging). */
+  draftBindCell: { tableId: string; rowIndex: number; colIndex: number } | null = null;
   draftInk: number[] | null = null;
   cursorWorld: Point = { x: 0, y: 0 };
   /** Node under the cursor (select tool, not dragging) — shows its ports. */
@@ -199,7 +207,7 @@ export class Editor {
     return null;
   }
 
-  /** Endpoint for a world point: a node, a table row, or a free point. */
+  /** Endpoint for a world point: a node, a table cell/row, or a free point. */
   private endpointFor(p: Point, excludeNodeId: string | null): Endpoint {
     const hit = this.hitNode(p);
     if (!hit || hit.id === excludeNodeId) return { point: p };
@@ -207,10 +215,30 @@ export class Editor {
       const cell = tableCellAt(hit, p);
       if (cell && cell.rowIndex >= 0) {
         const row = hit.rows[cell.rowIndex];
-        if (row) return { node: hit.id, anchor: "auto", row: row.id };
+        const col = hit.columns[cell.colIndex];
+        if (row) return { node: hit.id, anchor: "auto", row: row.id, column: col?.id };
       }
     }
     return { node: hit.id, anchor: "auto" };
+  }
+
+  /** If one end is a table cell and the other a text-bearing node, the
+   *  pair describes a cell binding rather than a connector. */
+  private cellLinkOf(a: Endpoint, b: Endpoint): {
+    nodeId: string; tableId: string; rowId: string; columnId: string;
+  } | null {
+    for (const [cellEnd, nodeEnd] of [[a, b], [b, a]] as const) {
+      if (!("node" in cellEnd) || !cellEnd.row || !cellEnd.column) continue;
+      if (!("node" in nodeEnd) || nodeEnd.node === cellEnd.node) continue;
+      const table = this.store.getNode(cellEnd.node);
+      const node = this.store.getNode(nodeEnd.node);
+      if (table?.type !== "table" || !node || !("text" in node)) continue;
+      return {
+        nodeId: node.id, tableId: table.id,
+        rowId: cellEnd.row, columnId: cellEnd.column,
+      };
+    }
+    return null;
   }
 
   singleSelectedNode(): Node | null {
@@ -425,9 +453,22 @@ export class Editor {
       case "create":
         this.draftRect = normalizeRect(drag.start, world);
         return;
-      case "connector":
+      case "connector": {
         if (this.draftConnector) this.draftConnector.to = world;
+        // Highlight the cell a drop would bind to.
+        this.draftBindCell = null;
+        const over = this.hitNode(world);
+        if (over?.type === "table" && drag.fromNode && drag.fromNode !== over.id) {
+          const source = this.store.getNode(drag.fromNode);
+          const cell = over ? tableCellAt(over, world) : null;
+          if (source && "text" in source && cell && cell.rowIndex >= 0) {
+            this.draftBindCell = {
+              tableId: over.id, rowIndex: cell.rowIndex, colIndex: cell.colIndex,
+            };
+          }
+        }
         return;
+      }
       case "ink":
         drag.points.push(world.x, world.y, 0.5);
         return;
@@ -500,12 +541,20 @@ export class Editor {
 
       case "connector": {
         this.draftConnector = null;
+        this.draftBindCell = null;
         const to = this.endpointFor(info.world, drag.fromNode);
         // A connector from a point to the same point is a misclick.
         if (
           "point" in drag.from && "point" in to &&
           Math.hypot(to.point.x - drag.from.point.x, to.point.y - drag.from.point.y) < 4
         ) return;
+        // Dropping on a specific cell binds the node to it (the cell
+        // becomes the source of truth) instead of drawing an arrow.
+        const link = this.cellLinkOf(drag.from, to);
+        if (link && this.hooks.bindNodeToCell(link)) {
+          this.tool = "select";
+          return;
+        }
         this.store.upsertConnector({
           id: this.hooks.newId(),
           type: "connector",

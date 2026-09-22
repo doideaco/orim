@@ -1,7 +1,7 @@
 import type { Connector, Node, NodeId } from "@orim/schema";
 import {
   elbowRoute, fieldChips, formatFieldValue, frameAggregates, nodeRect,
-  routeConnector, tableColumnEdges, tableColumnTotals, visibleWorldRect,
+  routeConnector, tableCellRect, tableColumnEdges, tableColumnTotals, visibleWorldRect,
   toScreen, CHIP_GAP_KV, CHIP_PAD, TABLE_ROW_H,
   type Camera, type Point, type Rect,
 } from "@orim/editor";
@@ -48,6 +48,8 @@ export interface Scene {
   portsFor: NodeId | null;
   /** Selected tree node that shows the add-child "+" below it. */
   treePlusFor: NodeId | null;
+  /** Table cell a connector drop would bind to (drag highlight). */
+  bindCell: { tableId: NodeId; rowIndex: number; colIndex: number } | null;
   /** Unresolved comments to draw as pins. */
   comments: BoardComment[];
   /** Vote totals per node; drawn as badges when present. */
@@ -385,6 +387,19 @@ export class Renderer {
       ctx.strokeRect(scene.draftRect.x, scene.draftRect.y, scene.draftRect.w, scene.draftRect.h);
       ctx.setLineDash([]);
     }
+    // The cell a connector drop would bind to.
+    if (scene.bindCell) {
+      const table = scene.getNode(scene.bindCell.tableId);
+      if (table?.type === "table") {
+        const r = tableCellRect(table, scene.bindCell.rowIndex, scene.bindCell.colIndex);
+        ctx.fillStyle = "rgba(79, 124, 255, 0.16)";
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = SELECTION_COLOR;
+        ctx.lineWidth = 1.75 / z;
+        ctx.strokeRect(r.x, r.y, r.w, r.h);
+      }
+    }
+
     if (scene.draftConnector) {
       const route = elbowRoute(scene.draftConnector.from, null, scene.draftConnector.to, null);
       this.drawConnector(route, "arrow", SELECTION_COLOR, 2 / z);
