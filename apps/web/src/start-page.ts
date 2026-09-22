@@ -157,10 +157,8 @@ export async function renderStartPage(): Promise<void> {
     let i = 0;
     const built = t.build(() => `t${i++}`);
     const preview = document.createElement("canvas");
-    preview.width = 392;
-    preview.height = 208;
-    preview.style.width = "196px";
-    preview.style.height = "104px";
+    preview.width = 480;
+    preview.height = 256;
     drawPreview(
       preview,
       built.nodes.map((n) => ({

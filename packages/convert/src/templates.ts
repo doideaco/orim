@@ -113,6 +113,62 @@ export const TEMPLATES: TemplateDef[] = [
     },
   },
   {
+    id: "org-chart",
+    name: "Org chart",
+    description: "A starter reporting tree",
+    build(newId) {
+      const root = newId(), a = newId(), b = newId();
+      return {
+        nodes: [
+          shape(root, "pill", "Lead", "violet", 120, 0),
+          shape(a, "rect", "Report", "blue", 0, 150),
+          shape(b, "rect", "Report", "blue", 240, 150),
+        ],
+        connectors: [arrow(newId(), root, a), arrow(newId(), root, b)],
+      };
+    },
+  },
+  {
+    id: "mind-map",
+    name: "Mind map",
+    description: "A center topic with branches",
+    build(newId) {
+      const center = newId();
+      const nodes: Node[] = [
+        shape(center, "ellipse", "Topic", "yellow", 300, 140, 200, 90),
+      ];
+      const connectors: Connector[] = [];
+      const branches: [string, PaletteColor, number, number][] = [
+        ["Branch", "teal", 0, 0], ["Branch", "blue", 620, 0],
+        ["Branch", "pink", 0, 290], ["Branch", "green", 620, 290],
+      ];
+      for (const [text, color, x, y] of branches) {
+        const id = newId();
+        nodes.push(shape(id, "rect", text, color, x, y));
+        connectors.push({ ...arrow(newId(), center, id), style: "line" });
+      }
+      return { nodes, connectors };
+    },
+  },
+  {
+    id: "swot",
+    name: "SWOT",
+    description: "Strengths · Weaknesses · Opportunities · Threats",
+    build(newId) {
+      const quads: [string, PaletteColor, number, number][] = [
+        ["Strengths", "green", 0, 0], ["Weaknesses", "red", 480, 0],
+        ["Opportunities", "blue", 0, 400], ["Threats", "orange", 480, 400],
+      ];
+      const nodes: Node[] = [];
+      for (const [title, color, x, y] of quads) {
+        const f = newId();
+        nodes.push(frame(f, title, x, y, 440, 360));
+        nodes.push(sticky(newId(), "", color, x + 24, y + 56, f));
+      }
+      return { nodes, connectors: [] };
+    },
+  },
+  {
     id: "service-blueprint",
     name: "Service blueprint",
     description: "Lanes for evidence → support",
