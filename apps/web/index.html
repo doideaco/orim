@@ -515,7 +515,11 @@
         display: grid; place-items: center;
       }
       .dialog {
+        /* .panel sets position: fixed, which would pull the dialog out of
+           the backdrop's grid centering — keep it in flow. */
+        position: static;
         width: 340px;
+        max-width: calc(100vw - 32px);
         padding: 20px;
         display: flex; flex-direction: column; gap: 10px;
         border-radius: 14px;
