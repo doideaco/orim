@@ -577,6 +577,32 @@ canvas.addEventListener(
   { passive: false },
 );
 
+// Safari sends trackpad pinches as gesture events, not ctrl+wheel. Left
+// unclaimed, Safari zooms the whole page as a bitmap and the board stays
+// blurry until the exact reverse pinch — so claim them and zoom the
+// camera, the same thing the pinch means everywhere else.
+interface SafariGestureEvent extends Event {
+  scale?: number;
+  clientX?: number;
+  clientY?: number;
+}
+let gestureScale = 1;
+canvas.addEventListener("gesturestart", (e: SafariGestureEvent) => {
+  e.preventDefault();
+  gestureScale = e.scale ?? 1;
+});
+canvas.addEventListener("gesturechange", (e: SafariGestureEvent) => {
+  e.preventDefault();
+  const scale = e.scale ?? 1;
+  if (gestureScale > 0) {
+    const at = { x: e.clientX ?? window.innerWidth / 2, y: e.clientY ?? window.innerHeight / 2 };
+    Object.assign(camera, zoomAt(camera, at, scale / gestureScale));
+  }
+  gestureScale = scale;
+  dirty = true;
+});
+canvas.addEventListener("gestureend", (e: Event) => e.preventDefault());
+
 // --- tree authoring (Tab = child, Enter = sibling, "+" under selection) ------
 
 type TreeEdge = import("@orim/schema").Connector & {
@@ -1182,6 +1208,18 @@ const watchPixelRatio = (): void => {
   );
 };
 watchPixelRatio();
+
+// Safari never fires resolution media-query changes, so also re-check
+// when the window regains focus — the moment a display swap becomes
+// visible to the user anyway.
+let lastDpr = window.devicePixelRatio;
+window.addEventListener("focus", () => {
+  if (window.devicePixelRatio !== lastDpr) {
+    lastDpr = window.devicePixelRatio;
+    renderer.resize();
+    dirty = true;
+  }
+});
 
 // --- toolbar -----------------------------------------------------------------
 
