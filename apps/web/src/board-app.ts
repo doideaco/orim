@@ -587,11 +587,11 @@ interface SafariGestureEvent extends Event {
   clientY?: number;
 }
 let gestureScale = 1;
-canvas.addEventListener("gesturestart", (e: SafariGestureEvent) => {
+window.addEventListener("gesturestart", (e: SafariGestureEvent) => {
   e.preventDefault();
   gestureScale = e.scale ?? 1;
 });
-canvas.addEventListener("gesturechange", (e: SafariGestureEvent) => {
+window.addEventListener("gesturechange", (e: SafariGestureEvent) => {
   e.preventDefault();
   const scale = e.scale ?? 1;
   if (gestureScale > 0) {
@@ -601,7 +601,7 @@ canvas.addEventListener("gesturechange", (e: SafariGestureEvent) => {
   gestureScale = scale;
   dirty = true;
 });
-canvas.addEventListener("gestureend", (e: Event) => e.preventDefault());
+window.addEventListener("gestureend", (e: Event) => e.preventDefault());
 
 // --- tree authoring (Tab = child, Enter = sibling, "+" under selection) ------
 
@@ -1220,6 +1220,28 @@ window.addEventListener("focus", () => {
     dirty = true;
   }
 });
+
+// ?debug — live readout of the numbers that explain soft rendering: the
+// canvas backing store must be the window size times the pixel ratio,
+// and a visual-viewport scale other than 1 means the browser itself is
+// scaling the page (Safari's pinch zoom).
+if (new URLSearchParams(location.search).has("debug")) {
+  const hud = document.createElement("div");
+  hud.style.cssText =
+    "position:fixed;right:10px;bottom:10px;background:#111;color:#4ade80;" +
+    "font:11px/1.5 ui-monospace,monospace;padding:7px 10px;border-radius:8px;" +
+    "z-index:99999;white-space:pre;pointer-events:none";
+  document.body.appendChild(hud);
+  const vv = window.visualViewport;
+  setInterval(() => {
+    hud.textContent =
+      `dpr ${window.devicePixelRatio}\n` +
+      `win ${window.innerWidth}×${window.innerHeight}\n` +
+      `cvs ${canvas.width}×${canvas.height}\n` +
+      `css ${canvas.style.width} ${canvas.style.height}\n` +
+      `vvp ${vv ? vv.scale.toFixed(3) : "n/a"}  zoom ${camera.zoom.toFixed(2)}`;
+  }, 500);
+}
 
 // --- toolbar -----------------------------------------------------------------
 
