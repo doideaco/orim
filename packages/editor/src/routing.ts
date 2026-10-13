@@ -219,13 +219,13 @@ function otherRef(
 }
 
 /**
- * Spread the connectors that share a node side along it, instead of
- * stacking them all on the side's center point — stacked ports made every
- * fan-in overlap on the final approach, and an anti-parallel pair (which
- * shares both sides) collapse into one coincident line. Ordering is by
- * where the other end lies, so lines leave in reading order and don't
- * cross each other at the port; ties (the anti-parallel pair) fall back
- * to connector id.
+ * Place the ports along a node side where the edges are actually headed,
+ * instead of stacking everything on the side's center point. Each
+ * connector wants the spot facing its other end (clamped to the side),
+ * so an aligned edge drops dead straight and a sideways edge exits by
+ * the corner it will turn at — no kink right under the node. A minimum
+ * separation keeps shared sides apart, which also splits fan-ins and
+ * anti-parallel pairs (whose tie breaks by connector id).
  */
 function fanAdjust(
   c: Connector,
@@ -240,8 +240,10 @@ function fanAdjust(
   if (!node) return;
   const rect = nodeRect(node);
   const horizontal = resolved.side === "n" || resolved.side === "s";
+  const lo = (horizontal ? rect.x : rect.y) + 12;
+  const hi = (horizontal ? rect.x + rect.w : rect.y + rect.h) - 12;
 
-  const members: { key: string; order: number }[] = [];
+  const members: { key: string; desired: number }[] = [];
   const consider = (s: Connector, end: "from" | "to"): void => {
     const se = end === "from" ? s.from : s.to;
     if (!plainAuto(se) || (se as { node: string }).node !== resolved.nodeId) return;
@@ -250,23 +252,28 @@ function fanAdjust(
     if (anchorSide(rect, "auto", towards) !== resolved.side) return;
     members.push({
       key: `${s.id}:${end}`,
-      order: horizontal ? towards.x : towards.y,
+      desired: Math.min(hi, Math.max(lo, horizontal ? towards.x : towards.y)),
     });
   };
   for (const s of siblings) {
     consider(s, "from");
     consider(s, "to");
   }
-  if (members.length <= 1) return;
-  members.sort((a, b) => a.order - b.order || (a.key < b.key ? -1 : 1));
+  members.sort((a, b) => a.desired - b.desired || (a.key < b.key ? -1 : 1));
   const idx = members.findIndex((m) => m.key === `${c.id}:${which}`);
   if (idx < 0) return;
-  const span = horizontal ? rect.w : rect.h;
-  const step = Math.min(FAN_STEP, Math.max(10, (span - 24) / members.length));
-  const off = (idx - (members.length - 1) / 2) * step;
+
+  const step = Math.min(FAN_STEP, Math.max(10, (hi - lo) / members.length));
+  const pos = members.map((m) => m.desired);
+  for (let i = 1; i < pos.length; i++) pos[i] = Math.max(pos[i]!, pos[i - 1]! + step);
+  if (pos[pos.length - 1]! > hi) {
+    pos[pos.length - 1] = hi;
+    for (let i = pos.length - 2; i >= 0; i--) pos[i] = Math.min(pos[i]!, pos[i + 1]! - step);
+  }
+
   resolved.p = horizontal
-    ? { x: resolved.p.x + off, y: resolved.p.y }
-    : { x: resolved.p.x, y: resolved.p.y + off };
+    ? { x: pos[idx]!, y: resolved.p.y }
+    : { x: resolved.p.x, y: pos[idx]! };
 }
 
 /**

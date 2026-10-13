@@ -52,8 +52,8 @@ async function insertBuilt(deps: DropDeps, built: BuiltImport, sourceLabel: stri
       : await layered(built.nodes, built.connectors, {
           direction: built.layout,
           // Wide enough that a label chip on a vertical edge clears the
-          // neighboring node in the same rank.
-          spacing: 64,
+          // neighboring node in the same rank, with breathing room.
+          spacing: 80,
         });
     for (const n of built.nodes) {
       const p = positions.get(n.id);
