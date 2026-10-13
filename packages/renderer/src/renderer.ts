@@ -89,8 +89,10 @@ export class Renderer {
     this.resize();
   }
 
-  resize(): void {
-    this.dpr = window.devicePixelRatio || 1;
+  /** `dpr` overrides window.devicePixelRatio — Safari keeps that constant
+   *  under its page zoom, so the app passes a corrected ratio there. */
+  resize(dpr?: number): void {
+    this.dpr = dpr ?? window.devicePixelRatio ?? 1;
     this.width = window.innerWidth;
     this.height = window.innerHeight;
     this.canvas.width = Math.round(this.width * this.dpr);

@@ -49,6 +49,24 @@ let dirty = true;
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
 
+/**
+ * The ratio of device pixels to CSS pixels, page zoom included. Safari
+ * keeps devicePixelRatio constant under its page zoom (and remembers the
+ * zoom per site), so a canvas sized by devicePixelRatio alone renders
+ * soft there until the user finds View → Actual Size. outerWidth is in
+ * screen points while innerWidth is in zoomed CSS pixels, so their ratio
+ * recovers the zoom; other browsers already fold zoom into the ratio.
+ */
+function effectiveDpr(): number {
+  let dpr = window.devicePixelRatio || 1;
+  if ("GestureEvent" in window && window.outerWidth > 0 && window.innerWidth > 0) {
+    const pageZoom = window.outerWidth / window.innerWidth;
+    if (pageZoom > 1.01 && pageZoom < 5) dpr *= pageZoom;
+  }
+  return Math.min(dpr, 4);
+}
+renderer.resize(effectiveDpr());
+
 // Chip layout uses real text measurement so hit rects match drawn pixels.
 {
   const mctx = document.createElement("canvas").getContext("2d")!;
@@ -1187,7 +1205,7 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("resize", () => {
-  renderer.resize();
+  renderer.resize(effectiveDpr());
   dirty = true;
 });
 
@@ -1200,7 +1218,7 @@ const watchPixelRatio = (): void => {
   mq.addEventListener(
     "change",
     () => {
-      renderer.resize();
+      renderer.resize(effectiveDpr());
       dirty = true;
       watchPixelRatio();
     },
@@ -1212,11 +1230,11 @@ watchPixelRatio();
 // Safari never fires resolution media-query changes, so also re-check
 // when the window regains focus — the moment a display swap becomes
 // visible to the user anyway.
-let lastDpr = window.devicePixelRatio;
+let lastDpr = effectiveDpr();
 window.addEventListener("focus", () => {
-  if (window.devicePixelRatio !== lastDpr) {
-    lastDpr = window.devicePixelRatio;
-    renderer.resize();
+  if (effectiveDpr() !== lastDpr) {
+    lastDpr = effectiveDpr();
+    renderer.resize(lastDpr);
     dirty = true;
   }
 });
@@ -1239,7 +1257,8 @@ if (new URLSearchParams(location.search).has("debug")) {
       `win ${window.innerWidth}×${window.innerHeight}\n` +
       `cvs ${canvas.width}×${canvas.height}\n` +
       `css ${canvas.style.width} ${canvas.style.height}\n` +
-      `vvp ${vv ? vv.scale.toFixed(3) : "n/a"}  zoom ${camera.zoom.toFixed(2)}`;
+      `vvp ${vv ? vv.scale.toFixed(3) : "n/a"}  zoom ${camera.zoom.toFixed(2)}\n` +
+      `pz  ${(window.outerWidth / window.innerWidth).toFixed(3)}  edpr ${effectiveDpr().toFixed(2)}`;
   }, 500);
 }
 
