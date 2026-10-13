@@ -136,6 +136,13 @@ export function buildFromMermaid(text: string, opts: TextBuildOpts): BuiltImport
   }
   if (!nodes.length) return null;
 
+  const indeg = new Map<string, number>();
+  const outdeg = new Map<string, number>();
+  for (const c of connectors) {
+    if ("node" in c.from) outdeg.set(c.from.node, (outdeg.get(c.from.node) ?? 0) + 1);
+    if ("node" in c.to) indeg.set(c.to.node, (indeg.get(c.to.node) ?? 0) + 1);
+  }
+
   // A strict hierarchy (one parent each, no cycles) is a tree, not a
   // general flowchart: the tidy tree centers every parent over its
   // children, which layered layout does not guarantee, and s→n anchors
@@ -146,10 +153,26 @@ export function buildFromMermaid(text: string, opts: TextBuildOpts): BuiltImport
       if ("node" in c.from) c.from.anchor = "s";
       if ("node" in c.to) c.to.anchor = "n";
     }
+    // Roots wear violet, the same mark CSV org charts give them.
+    for (const n of nodes) {
+      if (n.type === "shape" && !(indeg.get(n.id) ?? 0)) n.color = "violet";
+    }
     return {
       nodes, connectors, layout: "TREE",
       summary: `Mermaid: tree of ${nodes.length} nodes`,
     };
+  }
+
+  // Terminators carry their role: entries green, endings pink. Only on
+  // shapes the author drew as terminators (ellipse or pill) — a rect
+  // entry point stays a process box — and never red, which conditional
+  // color rules reserve for alerts.
+  for (const n of nodes) {
+    if (n.type !== "shape" || (n.kind !== "ellipse" && n.kind !== "pill")) continue;
+    const into = indeg.get(n.id) ?? 0;
+    const outof = outdeg.get(n.id) ?? 0;
+    if (!into && outof) n.color = "green";
+    else if (into && !outof) n.color = "pink";
   }
 
   return {

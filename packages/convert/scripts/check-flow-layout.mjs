@@ -127,7 +127,16 @@ const org = buildFromMermaid(
   a --> c[Report C]`,
   { newId: () => `t${seq++}`, origin: { x: 0, y: 0 }, index: "a0" },
 );
+// Terminators carry their role: entries green, endings pink, mid-flow
+// pills untouched, rect entries left as process boxes.
+check(at("Start").color === "green", "start terminator is green");
+check(at("End").color === "pink", "end terminator is pink");
+check(at("Caught up").color === "pink", "dead-end pill is pink");
+check(at("First watch").color === "blue", "mid-flow pill stays blue");
+check(at("Search card").color === "blue", "rect entry stays a process box");
+
 check(org.layout === "TREE", "strict hierarchy imports as TREE");
+check(org.nodes.find((n) => n.text === "Lead").color === "violet", "tree root wears violet");
 check(
   org.connectors.every((c) => c.from.anchor === "s" && c.to.anchor === "n"),
   "tree edges anchor s -> n",
