@@ -47,6 +47,45 @@ let defaultFillStyle: "solid" | "outline" | "none" = "solid";
 let dirty = true;
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+// Dev builds surface uncaught errors on the page itself: a dead render
+// loop otherwise just leaves a silent blank canvas on browsers whose
+// console nobody has open.
+if (import.meta.env.DEV) {
+  const report = (msg: string): void => {
+    let el = document.getElementById("dev-error");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "dev-error";
+      el.style.cssText =
+        "position:fixed;left:10px;bottom:10px;max-width:70vw;background:#7f1d1d;" +
+        "color:#fff;font:12px/1.5 ui-monospace,monospace;padding:8px 12px;" +
+        "border-radius:8px;z-index:99999;white-space:pre-wrap";
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+  };
+  window.addEventListener("error", (e) =>
+    report(`${e.message}\n${e.filename?.split("/").slice(-2).join("/")}:${e.lineno}`),
+  );
+  window.addEventListener("unhandledrejection", (e) => report(String(e.reason)));
+  // Phone render diagnostics home to the dev server once things settle.
+  setTimeout(() => {
+    const c = document.querySelector("canvas");
+    fetch("/__diag", {
+      method: "POST",
+      body: JSON.stringify({
+        ua: navigator.userAgent.includes("Chrome") ? "chromium" : "safari-ish",
+        dpr: window.devicePixelRatio,
+        inner: `${window.innerWidth}x${window.innerHeight}`,
+        outer: `${window.outerWidth}x${window.outerHeight}`,
+        cvs: c ? `${(c as HTMLCanvasElement).width}x${(c as HTMLCanvasElement).height}` : "none",
+        nodes: store.nodes.size,
+        cam: `${Math.round(camera.x)},${Math.round(camera.y)}@${camera.zoom.toFixed(2)}`,
+      }),
+    }).catch(() => {});
+  }, 4000);
+}
+
 const renderer = new Renderer(canvas);
 
 /**
