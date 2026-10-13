@@ -8,10 +8,14 @@ import { buildFromMermaid } from "../src/import-text.ts";
 import { layered } from "@orim/layout";
 import { routeConnector } from "@orim/editor";
 
-// The shape that uncovered all three failures: a reading loop with two
-// back-edges, a decision diamond, labelled edges, and a bar <-> away pair.
+// The shape that uncovered the failures: a reading loop with two
+// back-edges, a decision diamond, labelled edges, a bar <-> away pair,
+// and — crucially — a node (`first`) referenced lines before it is
+// defined, which fools any model-order cycle breaking into reversing
+// the forward edge that reaches it.
 const MERMAID = `flowchart TD
   start((Start)) --> brief[Brief]
+  search[Search card] -->|Watch this game| first
   brief -->|open a story| reader[Reader]
   reader --> panel[Side panel]
   panel -->|pick the lightest page| reader

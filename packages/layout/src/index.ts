@@ -36,6 +36,38 @@ export async function layered(
   );
   const spacing = options.spacing ?? 48;
 
+  // Authors declare the forward flow in order, but a node can be referenced
+  // lines before it is defined, so neither node nor edge model order can be
+  // trusted to tell a return loop from the forward path. Find the loops
+  // ourselves: DFS in declaration order from the sources; an edge into a
+  // node still on the stack is a back-edge. ELK ranks the remaining DAG and
+  // the loops still render — they just can't drag a mid-flow node upward.
+  const srcOf = (c: Connector) => (c.from as { node: string }).node;
+  const dstOf = (c: Connector) => (c.to as { node: string }).node;
+  const outgoing = new Map<string, Connector[]>();
+  const hasIncoming = new Set<string>();
+  for (const c of edges) {
+    if (!outgoing.has(srcOf(c))) outgoing.set(srcOf(c), []);
+    outgoing.get(srcOf(c))!.push(c);
+    hasIncoming.add(dstOf(c));
+  }
+  const backEdges = new Set<string>();
+  const visited = new Set<string>();
+  const stack = new Set<string>();
+  const dfs = (id: string): void => {
+    visited.add(id);
+    stack.add(id);
+    for (const c of outgoing.get(id) ?? []) {
+      const to = dstOf(c);
+      if (stack.has(to)) backEdges.add(c.id);
+      else if (!visited.has(to)) dfs(to);
+    }
+    stack.delete(id);
+  };
+  for (const n of nodes) if (!hasIncoming.has(n.id) && !visited.has(n.id)) dfs(n.id);
+  for (const n of nodes) if (!visited.has(n.id)) dfs(n.id); // source-less cycles
+  const ranked = edges.filter((c) => !backEdges.has(c.id));
+
   const elk = new ELK();
   const result = await elk.layout({
     id: "root",
@@ -44,17 +76,12 @@ export async function layered(
       "elk.direction": options.direction ?? "RIGHT",
       "elk.spacing.nodeNode": String(spacing),
       "elk.layered.spacing.nodeNodeBetweenLayers": String(spacing * 2),
-      // Authors write the forward flow first; edges that point against
-      // declaration order are the return loops. Breaking cycles by model
-      // order reverses those, instead of promoting a mid-flow node (a
-      // decision diamond with a back-edge) into the top rank.
-      "elk.layered.cycleBreaking.strategy": "MODEL_ORDER",
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
       "elk.edgeLabels.inline": "true",
       "elk.padding": "[top=0,left=0,bottom=0,right=0]",
     },
     children: nodes.map((n) => ({ id: n.id, width: n.w, height: n.h })),
-    edges: edges.map((c) => ({
+    edges: ranked.map((c) => ({
       id: c.id,
       sources: [(c.from as { node: string }).node],
       targets: [(c.to as { node: string }).node],
