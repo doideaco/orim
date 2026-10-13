@@ -347,7 +347,10 @@ export class Renderer {
 
     // Pass 3: connectors above content (like FigJam), so a short link
     // between adjacent nodes never disappears behind them. Routes avoid
-    // crossing nodes; recomputed only when the board changes.
+    // crossing nodes; recomputed only when the board changes. Lines all
+    // land before any label chip, so a later connector's line can never
+    // strike through an earlier connector's label.
+    const labelQueue: { route: Point[]; label: string }[] = [];
     for (const c of scene.connectors.values()) {
       const cached = this.routeCache.get(c.id);
       let route: Point[] | null;
@@ -366,8 +369,9 @@ export class Renderer {
       if (!inView({ x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 })) continue;
       const selected = scene.connectorSelection.has(c.id);
       this.drawConnector(route, c.style, selected ? SELECTION_COLOR : "#6B7280", 2 / z);
-      if (c.label && drawText) this.connectorLabel(route, c.label);
+      if (c.label && drawText) labelQueue.push({ route, label: c.label });
     }
+    for (const q of labelQueue) this.connectorLabel(q.route, q.label);
 
     // Resize handles for single selection.
     if (scene.selection.size === 1) {

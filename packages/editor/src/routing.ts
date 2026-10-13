@@ -17,7 +17,7 @@ const MARGIN = 16; // clearance kept around obstacles
 const STUB = 24;
 const BEND_COST = 60;
 const REGION_PAD = 160; // how far around the endpoints we look for obstacles
-const PAIR_GAP = 8; // half the separation between anti-parallel twins
+const FAN_STEP = 28; // spacing between connectors sharing a node side
 
 const SIDE_VEC: Record<Side, Point> = {
   n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 },
@@ -206,23 +206,74 @@ const sideToDir = (s: Side | null): number =>
 const plainAuto = (e: Endpoint): boolean =>
   !("point" in e) && e.anchor === "auto" && !e.row && !e.column;
 
-/** Another connector joining the same two nodes in the opposite direction;
- *  without separation the pair renders as one coincident line and the
- *  labels get struck through. */
-function hasReverseTwin(c: Connector, siblings: Iterable<Connector>): boolean {
-  if (!("node" in c.from) || !("node" in c.to)) return false;
+/** Reference point for the end of `c` opposite to `which`. */
+function otherRef(
+  c: Connector,
+  which: "from" | "to",
+  getNode: (id: string) => Node | undefined,
+): Point | null {
+  const e = which === "from" ? c.to : c.from;
+  if ("point" in e) return e.point;
+  const n = getNode(e.node);
+  return n ? rectCenter(nodeRect(n)) : null;
+}
+
+/**
+ * Spread the connectors that share a node side along it, instead of
+ * stacking them all on the side's center point — stacked ports made every
+ * fan-in overlap on the final approach, and an anti-parallel pair (which
+ * shares both sides) collapse into one coincident line. Ordering is by
+ * where the other end lies, so lines leave in reading order and don't
+ * cross each other at the port; ties (the anti-parallel pair) fall back
+ * to connector id.
+ */
+function fanAdjust(
+  c: Connector,
+  which: "from" | "to",
+  resolved: ResolvedEndpoint,
+  getNode: (id: string) => Node | undefined,
+  siblings: Iterable<Connector>,
+): void {
+  const e = which === "from" ? c.from : c.to;
+  if (!plainAuto(e) || !resolved.nodeId || !resolved.side) return;
+  const node = getNode(resolved.nodeId);
+  if (!node) return;
+  const rect = nodeRect(node);
+  const horizontal = resolved.side === "n" || resolved.side === "s";
+
+  const members: { key: string; order: number }[] = [];
+  const consider = (s: Connector, end: "from" | "to"): void => {
+    const se = end === "from" ? s.from : s.to;
+    if (!plainAuto(se) || (se as { node: string }).node !== resolved.nodeId) return;
+    const towards = otherRef(s, end, getNode);
+    if (!towards) return;
+    if (anchorSide(rect, "auto", towards) !== resolved.side) return;
+    members.push({
+      key: `${s.id}:${end}`,
+      order: horizontal ? towards.x : towards.y,
+    });
+  };
   for (const s of siblings) {
-    if (s.id === c.id || !("node" in s.from) || !("node" in s.to)) continue;
-    if (s.from.node === c.to.node && s.to.node === c.from.node) return true;
+    consider(s, "from");
+    consider(s, "to");
   }
-  return false;
+  if (members.length <= 1) return;
+  members.sort((a, b) => a.order - b.order || (a.key < b.key ? -1 : 1));
+  const idx = members.findIndex((m) => m.key === `${c.id}:${which}`);
+  if (idx < 0) return;
+  const span = horizontal ? rect.w : rect.h;
+  const step = Math.min(FAN_STEP, Math.max(10, (span - 24) / members.length));
+  const off = (idx - (members.length - 1) / 2) * step;
+  resolved.p = horizontal
+    ? { x: resolved.p.x + off, y: resolved.p.y }
+    : { x: resolved.p.x, y: resolved.p.y + off };
 }
 
 /**
  * Route a connector, detouring around nodes in its way. `nodes` is the
  * board content to avoid (frames and the endpoint nodes are ignored).
- * Pass `siblings` (the board's connectors) so anti-parallel pairs each
- * keep to their own side instead of overlapping.
+ * Pass `siblings` (the board's connectors) so connectors sharing a node
+ * side fan out along it instead of overlapping.
  */
 export function routeConnector(
   c: Connector,
@@ -234,16 +285,10 @@ export function routeConnector(
   if (!ends) return null;
   const { from, to } = ends;
 
-  // Keep right: each direction of an anti-parallel pair shifts to its own
-  // side of travel, so the two lines run parallel with both labels clear.
-  if (siblings && plainAuto(c.from) && plainAuto(c.to) && hasReverseTwin(c, siblings)) {
-    const dx = to.p.x - from.p.x;
-    const dy = to.p.y - from.p.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const ox = (-dy / len) * PAIR_GAP;
-    const oy = (dx / len) * PAIR_GAP;
-    from.p = { x: from.p.x + ox, y: from.p.y + oy };
-    to.p = { x: to.p.x + ox, y: to.p.y + oy };
+  if (siblings) {
+    const sibs = Array.isArray(siblings) ? siblings : [...siblings];
+    fanAdjust(c, "from", from, getNode, sibs);
+    fanAdjust(c, "to", to, getNode, sibs);
   }
 
   const plain = elbowRoute(from.p, from.side, to.p, to.side);

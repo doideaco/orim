@@ -17,6 +17,7 @@ const MERMAID = `flowchart TD
   start((Start)) --> brief[Brief]
   search[Search card] -->|Watch this game| first
   brief -->|open a story| reader[Reader]
+  brief -->|reach the end| caught(Caught up)
   reader --> panel[Side panel]
   panel -->|pick the lightest page| reader
   panel --> follow{Follow this?}
@@ -87,6 +88,18 @@ const [r1, r2] = pair.map((c) =>
 const mid = (r) => r[Math.floor(r.length / 2)];
 const apart = Math.hypot(mid(r1).x - mid(r2).x, mid(r1).y - mid(r2).y);
 check(apart >= 12, `anti-parallel twins separate (${apart.toFixed(1)}px apart mid-route)`);
+
+// Edges sharing a node side fan out along it instead of stacking on the
+// side's center point and overlapping on the approach.
+const briefId = at("Brief").id;
+const fanRoutes = built.connectors
+  .filter((c) => c.from.node === briefId)
+  .map((c) => routeConnector(c, getNode, built.nodes, built.connectors));
+const fanXs = fanRoutes.map((r) => r[0].x);
+check(
+  new Set(fanXs.map((x) => Math.round(x))).size === fanXs.length,
+  `edges sharing a side leave at distinct ports (${fanXs.map((x) => Math.round(x)).join(", ")})`,
+);
 
 // The board must stay compact enough to read at fit zoom: rank pitch is
 // node height plus 1.5x spacing, with no hidden label layers inflating it.

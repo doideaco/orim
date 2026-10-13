@@ -1165,6 +1165,24 @@ window.addEventListener("resize", () => {
   dirty = true;
 });
 
+// Dragging the window to a display with a different pixel density changes
+// devicePixelRatio without firing resize, leaving the canvas backing store
+// at the old scale — everything renders soft until the next reload. Watch
+// the ratio itself; the media query is per-value, so re-arm after each hit.
+const watchPixelRatio = (): void => {
+  const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+  mq.addEventListener(
+    "change",
+    () => {
+      renderer.resize();
+      dirty = true;
+      watchPixelRatio();
+    },
+    { once: true },
+  );
+};
+watchPixelRatio();
+
 // --- toolbar -----------------------------------------------------------------
 
 const TOOL_ICONS: Record<string, IconNode> = {
