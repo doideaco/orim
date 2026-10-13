@@ -81,6 +81,10 @@ export async function layered(
       // once doubled the board's height and fit-zoom turned to mush.
       "elk.layered.spacing.nodeNodeBetweenLayers": String(spacing * 1.5),
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+      // Network-simplex placement keeps chains dead straight; the default
+      // Brandes-Köpf leaves near-miss jogs (a spine offset by half a port)
+      // that read as sloppy at working zoom.
+      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
       "elk.padding": "[top=0,left=0,bottom=0,right=0]",
     },
     children: nodes.map((n) => ({ id: n.id, width: n.w, height: n.h })),
@@ -95,6 +99,49 @@ export async function layered(
   const out = new Map<string, Position>();
   for (const child of result.children ?? []) {
     out.set(child.id, { x: anchor.x + (child.x ?? 0), y: anchor.y + (child.y ?? 0) });
+  }
+
+  // Snap near-miss chains flush. Barycenter placement leaves a child a
+  // hair off its only parent's center where a side branch pulls on it —
+  // and a 30px jog reads as a mistake where a real offset reads as a
+  // decision. Walk ranks top-down and align such children when their
+  // rank has the room.
+  const SNAP = 36;
+  const CLEAR = 24;
+  const vertical = (options.direction ?? "RIGHT") === "DOWN" || options.direction === "UP";
+  const main = (n: Node) => (vertical ? out.get(n.id)!.x + n.w / 2 : out.get(n.id)!.y + n.h / 2);
+  const halfSpan = (n: Node) => (vertical ? n.w : n.h) / 2;
+  const rankOf = (n: Node) => (vertical ? out.get(n.id)!.y : out.get(n.id)!.x);
+  const parents = new Map<string, string[]>();
+  for (const c of ranked) {
+    const to = (c.to as { node: string }).node;
+    if (!parents.has(to)) parents.set(to, []);
+    parents.get(to)!.push((c.from as { node: string }).node);
+  }
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const placed = nodes.filter((n) => out.has(n.id));
+  const ranks = new Map<number, Node[]>();
+  for (const n of placed) {
+    const r = rankOf(n);
+    if (!ranks.has(r)) ranks.set(r, []);
+    ranks.get(r)!.push(n);
+  }
+  for (const r of [...ranks.keys()].sort((a, b) => a - b)) {
+    const row = ranks.get(r)!.sort((a, b) => main(a) - main(b));
+    row.forEach((n, i) => {
+      const ps = parents.get(n.id);
+      if (!ps || ps.length !== 1 || !byId.has(ps[0]!) || !out.has(ps[0]!)) return;
+      const target = main(byId.get(ps[0]!)!);
+      const delta = target - main(n);
+      if (delta === 0 || Math.abs(delta) > SNAP) return;
+      const left = row[i - 1];
+      const right = row[i + 1];
+      const newMain = main(n) + delta;
+      if (left && newMain - halfSpan(n) < main(left) + halfSpan(left) + CLEAR) return;
+      if (right && newMain + halfSpan(n) > main(right) - halfSpan(right) - CLEAR) return;
+      const p = out.get(n.id)!;
+      out.set(n.id, vertical ? { x: p.x + delta, y: p.y } : { x: p.x, y: p.y + delta });
+    });
   }
   return out;
 }
