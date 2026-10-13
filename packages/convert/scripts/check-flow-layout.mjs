@@ -88,4 +88,34 @@ const mid = (r) => r[Math.floor(r.length / 2)];
 const apart = Math.hypot(mid(r1).x - mid(r2).x, mid(r1).y - mid(r2).y);
 check(apart >= 12, `anti-parallel twins separate (${apart.toFixed(1)}px apart mid-route)`);
 
+// The board must stay compact enough to read at fit zoom: rank pitch is
+// node height plus 1.5x spacing, with no hidden label layers inflating it.
+const ys = [...new Set(built.nodes.map((n) => n.y))].sort((a, b) => a - b);
+const maxPitch = Math.max(...ys.slice(1).map((y, i) => y - ys[i]));
+check(maxPitch <= 60 + 40 * 1.5 + 1, `rank pitch stays compact (max ${maxPitch}px)`);
+
+// A strict hierarchy pastes as a living tree: parents centered over
+// children, reporting lines anchored s -> n.
+seq = 0;
+const org = buildFromMermaid(
+  `flowchart TD
+  lead[Lead] --> a[Report A]
+  lead --> b[Report B]
+  a --> c[Report C]`,
+  { newId: () => `t${seq++}`, origin: { x: 0, y: 0 }, index: "a0" },
+);
+check(org.layout === "TREE", "strict hierarchy imports as TREE");
+check(
+  org.connectors.every((c) => c.from.anchor === "s" && c.to.anchor === "n"),
+  "tree edges anchor s -> n",
+);
+const { tree } = await import("@orim/layout");
+const tpos = tree(org.nodes, org.connectors);
+for (const n of org.nodes) Object.assign(n, tpos.get(n.id));
+const tAt = (text) => org.nodes.find((n) => n.text === text);
+const leadCenter = tAt("Lead").x + tAt("Lead").w / 2;
+const kidsCenter =
+  (tAt("Report A").x + tAt("Report A").w / 2 + tAt("Report B").x + tAt("Report B").w / 2) / 2;
+check(Math.abs(leadCenter - kidsCenter) < 1, "parent centers over its children");
+
 process.exit(failed ? 1 : 0);

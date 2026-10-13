@@ -135,10 +135,46 @@ export function buildFromMermaid(text: string, opts: TextBuildOpts): BuiltImport
     }
   }
   if (!nodes.length) return null;
+
+  // A strict hierarchy (one parent each, no cycles) is a tree, not a
+  // general flowchart: the tidy tree centers every parent over its
+  // children, which layered layout does not guarantee, and s→n anchors
+  // make the board treat it as a living tree (Tab adds a child, arrows
+  // walk it). Only for downward charts — the tidy tree reads vertically.
+  if (layout === "DOWN" && connectors.length && isStrictHierarchy(connectors)) {
+    for (const c of connectors) {
+      if ("node" in c.from) c.from.anchor = "s";
+      if ("node" in c.to) c.to.anchor = "n";
+    }
+    return {
+      nodes, connectors, layout: "TREE",
+      summary: `Mermaid: tree of ${nodes.length} nodes`,
+    };
+  }
+
   return {
     nodes, connectors, layout,
     summary: `Mermaid: ${nodes.length} nodes, ${connectors.length} edges`,
   };
+}
+
+function isStrictHierarchy(connectors: Connector[]): boolean {
+  const parentOf = new Map<string, string>();
+  for (const c of connectors) {
+    if (!("node" in c.from) || !("node" in c.to)) return false;
+    if (c.from.node === c.to.node || parentOf.has(c.to.node)) return false;
+    parentOf.set(c.to.node, c.from.node);
+  }
+  for (const start of parentOf.keys()) {
+    const seen = new Set<string>([start]);
+    let cur = parentOf.get(start);
+    while (cur !== undefined) {
+      if (seen.has(cur)) return false;
+      seen.add(cur);
+      cur = parentOf.get(cur);
+    }
+  }
+  return true;
 }
 
 // --- Markdown ----------------------------------------------------------------

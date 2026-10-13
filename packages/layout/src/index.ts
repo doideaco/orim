@@ -75,9 +75,12 @@ export async function layered(
       "elk.algorithm": "layered",
       "elk.direction": options.direction ?? "RIGHT",
       "elk.spacing.nodeNode": String(spacing),
-      "elk.layered.spacing.nodeNodeBetweenLayers": String(spacing * 2),
+      // 1.5x, not 2x, and no label layers in the model: labels render as
+      // chips on the line, so what they need is in-rank clearance (the
+      // caller's spacing), never their own rank — modelling them inline
+      // once doubled the board's height and fit-zoom turned to mush.
+      "elk.layered.spacing.nodeNodeBetweenLayers": String(spacing * 1.5),
       "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
-      "elk.edgeLabels.inline": "true",
       "elk.padding": "[top=0,left=0,bottom=0,right=0]",
     },
     children: nodes.map((n) => ({ id: n.id, width: n.w, height: n.h })),
@@ -85,10 +88,6 @@ export async function layered(
       id: c.id,
       sources: [(c.from as { node: string }).node],
       targets: [(c.to as { node: string }).node],
-      // Labelled edges reserve room so the label never crams against nodes.
-      ...(c.label
-        ? { labels: [{ text: c.label, width: c.label.length * 7 + 16, height: 20 }] }
-        : {}),
     })),
   });
 
