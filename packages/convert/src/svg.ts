@@ -189,7 +189,7 @@ export function boardToSVG(board: ExportBoard): string {
 
   // Connectors above content, matching the canvas renderer.
   for (const c of board.connectors) {
-    const route = routeConnector(c as Connector, getNode, board.nodes);
+    const route = routeConnector(c as Connector, getNode, board.nodes, board.connectors as Connector[]);
     if (!route || route.length < 2) continue;
     parts.push(`<path d="${pathFrom(route)}" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />`);
     const last = route[route.length - 1]!;

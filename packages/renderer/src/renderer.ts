@@ -354,7 +354,7 @@ export class Renderer {
       if (cached && cached.rev === scene.revision) {
         route = cached.route;
       } else {
-        route = routeConnector(c, scene.getNode, scene.nodesSorted);
+        route = routeConnector(c, scene.getNode, scene.nodesSorted, scene.connectors.values());
         this.routeCache.set(c.id, { rev: scene.revision, route });
       }
       if (!route || route.length < 2) continue;

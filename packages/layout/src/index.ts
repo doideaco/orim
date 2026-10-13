@@ -44,6 +44,13 @@ export async function layered(
       "elk.direction": options.direction ?? "RIGHT",
       "elk.spacing.nodeNode": String(spacing),
       "elk.layered.spacing.nodeNodeBetweenLayers": String(spacing * 2),
+      // Authors write the forward flow first; edges that point against
+      // declaration order are the return loops. Breaking cycles by model
+      // order reverses those, instead of promoting a mid-flow node (a
+      // decision diamond with a back-edge) into the top rank.
+      "elk.layered.cycleBreaking.strategy": "MODEL_ORDER",
+      "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+      "elk.edgeLabels.inline": "true",
       "elk.padding": "[top=0,left=0,bottom=0,right=0]",
     },
     children: nodes.map((n) => ({ id: n.id, width: n.w, height: n.h })),
@@ -51,6 +58,10 @@ export async function layered(
       id: c.id,
       sources: [(c.from as { node: string }).node],
       targets: [(c.to as { node: string }).node],
+      // Labelled edges reserve room so the label never crams against nodes.
+      ...(c.label
+        ? { labels: [{ text: c.label, width: c.label.length * 7 + 16, height: 20 }] }
+        : {}),
     })),
   });
 

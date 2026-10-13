@@ -17,6 +17,7 @@ const MARGIN = 16; // clearance kept around obstacles
 const STUB = 24;
 const BEND_COST = 60;
 const REGION_PAD = 160; // how far around the endpoints we look for obstacles
+const PAIR_GAP = 8; // half the separation between anti-parallel twins
 
 const SIDE_VEC: Record<Side, Point> = {
   n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 },
@@ -202,18 +203,48 @@ function orthoAStar(
 const sideToDir = (s: Side | null): number =>
   s === "e" ? 0 : s === "s" ? 1 : s === "w" ? 2 : s === "n" ? 3 : -1;
 
+const plainAuto = (e: Endpoint): boolean =>
+  !("point" in e) && e.anchor === "auto" && !e.row && !e.column;
+
+/** Another connector joining the same two nodes in the opposite direction;
+ *  without separation the pair renders as one coincident line and the
+ *  labels get struck through. */
+function hasReverseTwin(c: Connector, siblings: Iterable<Connector>): boolean {
+  if (!("node" in c.from) || !("node" in c.to)) return false;
+  for (const s of siblings) {
+    if (s.id === c.id || !("node" in s.from) || !("node" in s.to)) continue;
+    if (s.from.node === c.to.node && s.to.node === c.from.node) return true;
+  }
+  return false;
+}
+
 /**
  * Route a connector, detouring around nodes in its way. `nodes` is the
  * board content to avoid (frames and the endpoint nodes are ignored).
+ * Pass `siblings` (the board's connectors) so anti-parallel pairs each
+ * keep to their own side instead of overlapping.
  */
 export function routeConnector(
   c: Connector,
   getNode: (id: string) => Node | undefined,
   nodes: Iterable<Node>,
+  siblings?: Iterable<Connector>,
 ): Point[] | null {
   const ends = resolveEndpoints(c, getNode);
   if (!ends) return null;
   const { from, to } = ends;
+
+  // Keep right: each direction of an anti-parallel pair shifts to its own
+  // side of travel, so the two lines run parallel with both labels clear.
+  if (siblings && plainAuto(c.from) && plainAuto(c.to) && hasReverseTwin(c, siblings)) {
+    const dx = to.p.x - from.p.x;
+    const dy = to.p.y - from.p.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ox = (-dy / len) * PAIR_GAP;
+    const oy = (dx / len) * PAIR_GAP;
+    from.p = { x: from.p.x + ox, y: from.p.y + oy };
+    to.p = { x: to.p.x + ox, y: to.p.y + oy };
+  }
 
   const plain = elbowRoute(from.p, from.side, to.p, to.side);
 

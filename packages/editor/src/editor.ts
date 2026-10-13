@@ -126,7 +126,9 @@ export class Editor {
   hitConnector(p: Point): Connector | null {
     const tolerance = 8 / this.camera.zoom;
     for (const c of this.store.connectors.values()) {
-      const route = routeConnector(c, (id) => this.store.getNode(id), this.store.nodesSorted);
+      const route = routeConnector(
+        c, (id) => this.store.getNode(id), this.store.nodesSorted, this.store.connectors.values(),
+      );
       if (!route) continue;
       for (let i = 0; i < route.length - 1; i++) {
         if (distToSegment(p, route[i]!, route[i + 1]!) <= tolerance) return c;

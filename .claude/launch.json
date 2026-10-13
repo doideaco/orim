@@ -3,7 +3,8 @@
   "configurations": [
     {
       "name": "web",
-      "url": "http://localhost:5181",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/web", "dev"],
       "port": 5181
     },
     {

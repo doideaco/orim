@@ -34,6 +34,10 @@ jobs:
         run: node --import tsx scripts/check-miro.mjs
         working-directory: packages/convert
 
+      - name: Flowchart layout regression (cycles, labels, twins)
+        run: node --import tsx scripts/check-flow-layout.mjs
+        working-directory: packages/convert
+
       - name: Spec generation stays in sync
         run: |
           node --import tsx scripts/generate-spec.mjs
