@@ -89,6 +89,16 @@ const mid = (r) => r[Math.floor(r.length / 2)];
 const apart = Math.hypot(mid(r1).x - mid(r2).x, mid(r1).y - mid(r2).y);
 check(apart >= 12, `anti-parallel twins separate (${apart.toFixed(1)}px apart mid-route)`);
 
+// A diamond only meets its bounding box at the side midpoints, so its
+// ports never slide — an aimed port on the box edge would float in air.
+const follow = at("Follow this?");
+const followOut = built.connectors.find((c) => c.from.node === follow.id && c.to.node === at("First watch").id);
+const followRoute = routeConnector(followOut, getNode, built.nodes, built.connectors);
+check(
+  Math.abs(followRoute[0].x - (follow.x + follow.w / 2)) < 0.5,
+  "diamond ports stay on the vertex",
+);
+
 // Edges sharing a node side fan out along it instead of stacking on the
 // side's center point and overlapping on the approach.
 const briefId = at("Brief").id;

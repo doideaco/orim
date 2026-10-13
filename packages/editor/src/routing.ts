@@ -227,6 +227,19 @@ function otherRef(
  * separation keeps shared sides apart, which also splits fan-ins and
  * anti-parallel pairs (whose tie breaks by connector id).
  */
+/** How far a port may slide from the side's center and still sit on the
+ *  shape's visible outline. A diamond or ellipse only touches its bounding
+ *  box at the side midpoints, so their ports stay put; a pill's straight
+ *  run stops where the end caps begin. */
+function portSlack(n: Node, horizontal: boolean): number {
+  const half = (horizontal ? n.w : n.h) / 2;
+  if (n.type === "shape") {
+    if (n.kind === "diamond" || n.kind === "ellipse") return 0;
+    if (n.kind === "pill") return Math.max(0, half - Math.min(n.w, n.h) / 2);
+  }
+  return Math.max(0, half - 12);
+}
+
 function fanAdjust(
   c: Connector,
   which: "from" | "to",
@@ -240,8 +253,11 @@ function fanAdjust(
   if (!node) return;
   const rect = nodeRect(node);
   const horizontal = resolved.side === "n" || resolved.side === "s";
-  const lo = (horizontal ? rect.x : rect.y) + 12;
-  const hi = (horizontal ? rect.x + rect.w : rect.y + rect.h) - 12;
+  const slack = portSlack(node, horizontal);
+  if (slack <= 0) return;
+  const center = horizontal ? rect.x + rect.w / 2 : rect.y + rect.h / 2;
+  const lo = center - slack;
+  const hi = center + slack;
 
   const members: { key: string; desired: number }[] = [];
   const consider = (s: Connector, end: "from" | "to"): void => {
@@ -268,7 +284,9 @@ function fanAdjust(
   for (let i = 1; i < pos.length; i++) pos[i] = Math.max(pos[i]!, pos[i - 1]! + step);
   if (pos[pos.length - 1]! > hi) {
     pos[pos.length - 1] = hi;
-    for (let i = pos.length - 2; i >= 0; i--) pos[i] = Math.min(pos[i]!, pos[i + 1]! - step);
+    for (let i = pos.length - 2; i >= 0; i--) {
+      pos[i] = Math.max(lo, Math.min(pos[i]!, pos[i + 1]! - step));
+    }
   }
 
   resolved.p = horizontal
