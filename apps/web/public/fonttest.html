@@ -86,5 +86,31 @@
     row.append(tag, clip);
     rows.append(row);
   }
+  // The board's canvas is position:fixed and viewport-filling — the one
+  // structural property the rows above don't share. Paint a specimen on
+  // the right-hand side of such a layer; if it alone goes soft, the
+  // browser treats fixed fullscreen canvas layers differently.
+  const fixed = document.createElement("canvas");
+  fixed.style.cssText = "position:fixed;inset:0;z-index:-1";
+  const fw = innerWidth, fh = innerHeight;
+  fixed.width = Math.round(fw * DPR);
+  fixed.height = Math.round(fh * DPR);
+  fixed.style.width = fw + "px";
+  fixed.style.height = fh + "px";
+  const fx = fixed.getContext("2d");
+  fx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  fx.fillStyle = "#e8f4e8";
+  fx.fillRect(0, 0, fw, fh);
+  fx.fillStyle = "#1f2430";
+  fx.font = "500 13px system-ui, sans-serif";
+  for (let y = 40; y < fh - 20; y += 90) {
+    fx.fillText("FIXED FULLSCREEN LAYER — " + TEXT, Math.max(8, fw - 460), y);
+  }
+  fx.strokeStyle = "#6b7280";
+  fx.lineWidth = 1;
+  fx.strokeRect(Math.max(8, fw - 460) + 0.5, 52.5, 360, 14);
+  document.body.prepend(fixed);
+  document.body.style.background = "transparent";
+
   document.title = "canvas text test · dpr " + DPR;
 </script>
