@@ -74,6 +74,7 @@ if (import.meta.env.DEV) {
     fetch("/__diag", {
       method: "POST",
       body: JSON.stringify({
+        v: "ink-1", // bump when diagnosing whether a client runs current code
         ua: navigator.userAgent.includes("Chrome") ? "chromium" : "safari-ish",
         dpr: window.devicePixelRatio,
         inner: `${window.innerWidth}x${window.innerHeight}`,

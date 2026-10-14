@@ -206,7 +206,11 @@ export class Renderer {
           ctx.fillStyle = color.fill;
           this.path(n, "rect", 6);
           ctx.fill();
-          ctx.strokeStyle = color.edge;
+          // A border one shade off its own fill doesn't define an edge —
+          // it builds a fill→edge→background ramp that reads as soft at
+          // any resolution. The solid tone at reduced alpha draws a real
+          // boundary, which is where the "crisp" in whiteboard apps lives.
+          ctx.strokeStyle = color.solid + "73";
           ctx.lineWidth = 1 / z;
           ctx.stroke();
           if (drawText && n.id !== scene.editingId && n.text) {
@@ -222,7 +226,7 @@ export class Renderer {
             ctx.fillStyle = n.fillStyle === "solid" ? color.fill : CANVAS_BG;
             ctx.fill();
           }
-          ctx.strokeStyle = n.fillStyle === "outline" ? color.solid : color.edge;
+          ctx.strokeStyle = n.fillStyle === "outline" ? color.solid : color.solid + "73";
           ctx.lineWidth = (n.fillStyle === "outline" ? 2 : 1) / Math.max(z, 0.25);
           ctx.stroke();
           if (drawText && n.id !== scene.editingId && n.text) {
