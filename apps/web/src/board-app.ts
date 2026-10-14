@@ -2211,12 +2211,26 @@ let frames = 0;
 let fpsWindowStart = performance.now();
 let lastMinimap = 0;
 
+let lastLinksKey = "";
+
 function frame(): void {
   // While time-travelling, the scene renders the historical store;
   // live-only affordances (presence, comments, votes, links) hide.
   const src = historyStore ?? store;
   const dataLinks = historyStore ? [] : computeDataLinks();
-  if (dirty || presences.length > 0 || overlay.activeId || dataLinks.length) {
+  // Repaint only when something changed. Presence updates set dirty via
+  // the awareness handler; merely having idle collaborators must not
+  // repaint a fullscreen layer every frame — browsers degrade the
+  // compositing quality of layers that never stop invalidating (and the
+  // battery pays for it).
+  const linksKey = dataLinks.length
+    ? dataLinks.map((l) => `${l.a.x},${l.a.y},${l.b.x},${l.b.y}`).join(";")
+    : "";
+  if (linksKey !== lastLinksKey) {
+    lastLinksKey = linksKey;
+    dirty = true;
+  }
+  if (dirty || overlay.activeId) {
     renderer.render({
       nodesSorted: src.nodesSorted,
       connectors: src.connectors,

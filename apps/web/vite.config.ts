@@ -19,5 +19,8 @@ const diagEndpoint = (): Plugin => ({
 });
 
 export default defineConfig({
+  // Bind IPv4 and IPv6: default binding was [::1] only, and browsers
+  // that resolve localhost to 127.0.0.1 saw "server not up".
+  server: { host: true },
   plugins: [diagEndpoint()],
 });
