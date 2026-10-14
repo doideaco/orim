@@ -82,6 +82,16 @@ export class Renderer {
   onNeedsRender: (() => void) | null = null;
   private imageCache = new Map<NodeId, { src: string; img: HTMLImageElement; ready: boolean }>();
   private wrapCache = new Map<NodeId, { key: string; lines: string[] }>();
+  /** Device pixels per world unit for the frame being drawn. */
+  private pxScale = 2;
+
+  /** Snap a world coordinate onto the device pixel grid. Centered text
+   *  starts at fractional offsets by construction, and Safari's canvas
+   *  antialiasing turns off-grid glyphs noticeably softer than the DOM
+   *  text beside them. */
+  private snap(v: number): number {
+    return Math.round(v * this.pxScale) / this.pxScale;
+  }
   private inkCache = new Map<NodeId, { key: number; path: Path2D }>();
   private routeCache = new Map<NodeId, { rev: number; route: Point[] | null }>();
 
@@ -108,6 +118,7 @@ export class Renderer {
     const { ctx } = this;
     const { camera } = scene;
     const z = camera.zoom;
+    this.pxScale = this.dpr * z;
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = CANVAS_BG;
@@ -821,7 +832,7 @@ export class Renderer {
     ctx.restore();
     ctx.fillStyle = "#374151";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, mid.x - tw / 2, mid.y + 0.5);
+    ctx.fillText(label, this.snap(mid.x - tw / 2), this.snap(mid.y + 0.5));
     ctx.textBaseline = "top";
   }
 
@@ -862,9 +873,9 @@ export class Renderer {
       if (ty + lineH > n.y + n.h - padding / 2) break;
       if (centered) {
         const tw = ctx.measureText(line).width;
-        ctx.fillText(line, n.x + (n.w - tw) / 2, ty);
+        ctx.fillText(line, this.snap(n.x + (n.w - tw) / 2), this.snap(ty));
       } else {
-        ctx.fillText(line, n.x + padding, ty);
+        ctx.fillText(line, this.snap(n.x + padding), this.snap(ty));
       }
       ty += lineH;
     }
