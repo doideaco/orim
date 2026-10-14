@@ -51,8 +51,20 @@ interface PreviewNode {
 
 function drawPreview(canvas: HTMLCanvasElement, nodes: PreviewNode[]): void {
   const ctx = canvas.getContext("2d")!;
-  const W = canvas.width;
-  const H = canvas.height;
+  // Cards stretch to their grid column, so back the bitmap at the
+  // laid-out size times the pixel ratio — the fixed attribute size left
+  // every thumbnail upscaled and soft on wide windows. Callers invoke
+  // this after layout; before layout the attribute size still applies.
+  const dpr = window.devicePixelRatio || 1;
+  let W = canvas.width;
+  let H = canvas.height;
+  if (canvas.clientWidth) {
+    W = canvas.clientWidth;
+    H = canvas.clientHeight || Math.round((W * canvas.height) / canvas.width);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+  }
+  ctx.setTransform(canvas.clientWidth ? dpr : 1, 0, 0, canvas.clientWidth ? dpr : 1, 0, 0);
   ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(0, 0, W, H);
   // A whisper of the dot grid, so previews read as canvas.
@@ -173,13 +185,12 @@ export async function renderStartPage(): Promise<void> {
     const preview = document.createElement("canvas");
     preview.width = 480;
     preview.height = 256;
-    drawPreview(
-      preview,
-      built.nodes.map((n) => ({
-        x: n.x, y: n.y, w: n.w, h: n.h, type: n.type,
-        color: "color" in n ? n.color : null,
-      })),
-    );
+    const previewNodes = built.nodes.map((n) => ({
+      x: n.x, y: n.y, w: n.w, h: n.h, type: n.type,
+      color: "color" in n ? n.color : null,
+    }));
+    // After layout, so the bitmap matches the card's real size.
+    requestAnimationFrame(() => drawPreview(preview, previewNodes));
     const meta = document.createElement("div");
     meta.className = "meta";
     const title = document.createElement("strong");
@@ -258,7 +269,8 @@ function boardCard(info: BoardInfo): HTMLElement {
     const preview = document.createElement("canvas");
     preview.width = 496;
     preview.height = 280;
-    drawPreview(preview, info.nodes);
+    // After layout, so the bitmap matches the card's real size.
+    requestAnimationFrame(() => drawPreview(preview, info.nodes));
     const meta = document.createElement("div");
     meta.className = "meta";
     const title = document.createElement("strong");
