@@ -841,7 +841,10 @@ export class Renderer {
   ): void {
     const { ctx } = this;
     ctx.fillStyle = color;
-    ctx.font = `${fontSize}px ${FONT_STACK}`;
+    // Medium weight: canvas text gets grayscale antialiasing only, so at
+    // regular weight it reads thinner — "blurrier" — than the identically
+    // sized DOM text around it, even with a correctly sampled backing.
+    ctx.font = `500 ${fontSize}px ${FONT_STACK}`;
     ctx.textBaseline = "top";
     const lines = this.wrap(id, text, n.w - padding * 2, fontSize);
     const lineH = fontSize * 1.35;
@@ -865,7 +868,7 @@ export class Renderer {
     const cached = this.wrapCache.get(id);
     if (cached && cached.key === key) return cached.lines;
     const { ctx } = this;
-    ctx.font = `${fontSize}px ${FONT_STACK}`;
+    ctx.font = `500 ${fontSize}px ${FONT_STACK}`; // match drawWrappedText
     const lines: string[] = [];
     for (const raw of text.split("\n")) {
       let line = "";
