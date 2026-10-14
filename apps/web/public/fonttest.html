@@ -1,0 +1,90 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>canvas text test</title>
+<style>
+  body { font-family: system-ui; margin: 24px; background: #f4f4f2; color: #1f2430; }
+  h1 { font-size: 15px; }
+  .row { display: flex; align-items: center; gap: 16px; margin: 12px 0; }
+  .tag { width: 420px; font: 11px/1.4 ui-monospace, monospace; color: #555; }
+  .dom { font: 500 13px -apple-system, system-ui, sans-serif; background: #fff; padding: 5px 8px; }
+  canvas { background: #fff; }
+</style>
+<h1>Same string: DOM reference vs canvas variants (zoom with &#8984;+ to inspect)</h1>
+<div class="row"><div class="tag">DOM reference — 500 13px -apple-system</div><div class="dom">The brief: five stories, markers for what</div></div>
+<div id="rows"></div>
+<script>
+  const TEXT = "The brief: five stories, markers for what";
+  const DPR = devicePixelRatio;
+  const variants = [
+    ["400 13px -apple-system, system-ui, sans-serif", "old stack 400"],
+    ["500 13px -apple-system, system-ui, sans-serif", "old stack 500"],
+    ["400 13px system-ui, -apple-system, sans-serif", "system-ui 400"],
+    ["500 13px system-ui, -apple-system, sans-serif", "system-ui 500"],
+    ["500 13px 'Helvetica Neue', Arial, sans-serif", "helvetica neue 500"],
+    ["13px sans-serif", "default sans 400"],
+  ];
+  const rows = document.getElementById("rows");
+  for (const [font, label] of variants) {
+    const row = document.createElement("div");
+    row.className = "row";
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    const c = document.createElement("canvas");
+    const w = 420, h = 26;
+    c.width = Math.round(w * DPR);
+    c.height = Math.round(h * DPR);
+    c.style.width = w + "px";
+    c.style.height = h + "px";
+    const x = c.getContext("2d");
+    x.setTransform(DPR, 0, 0, DPR, 0, 0);
+    x.fillStyle = "#fff";
+    x.fillRect(0, 0, w, h);
+    x.font = font;
+    // If the browser rejected the assignment, the resolved font exposes it.
+    tag.textContent = label + "  → resolved: " + x.font;
+    x.fillStyle = "#1f2430";
+    x.textBaseline = "middle";
+    x.fillText(TEXT, 8, h / 2);
+    row.append(tag, c);
+    rows.append(row);
+  }
+  // Size ladder: same text and a hairline box drawn into canvases of
+  // increasing total area. If big ones go soft while small ones stay
+  // crisp, the browser is silently reducing large backing stores.
+  const areas = [
+    ["small", 420, 100],
+    ["4M px", 1400, 720],
+    ["8M px", 1980, 1010],
+    ["10M px", 2030, 1240],
+  ];
+  for (const [label, w, h] of areas) {
+    const row = document.createElement("div");
+    row.className = "row";
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * DPR);
+    c.height = Math.round(h * DPR);
+    c.style.width = w + "px";
+    c.style.height = h + "px";
+    const clip = document.createElement("div");
+    clip.style.cssText = "height:60px;overflow:hidden;flex:none";
+    clip.append(c);
+    const x = c.getContext("2d");
+    x.setTransform(DPR, 0, 0, DPR, 0, 0);
+    x.fillStyle = "#fff";
+    x.fillRect(0, 0, w, h);
+    x.font = "500 13px system-ui, sans-serif";
+    x.fillStyle = "#1f2430";
+    x.textBaseline = "middle";
+    x.fillText(TEXT + " — " + label, 8, 20);
+    x.strokeStyle = "#6b7280";
+    x.lineWidth = 1;
+    x.strokeRect(8.5, 36.5, 300, 14);
+    tag.textContent = label + " backing " + c.width + "×" + c.height +
+      " (" + ((c.width * c.height) / 1e6).toFixed(1) + "M px)";
+    row.append(tag, clip);
+    rows.append(row);
+  }
+  document.title = "canvas text test · dpr " + DPR;
+</script>

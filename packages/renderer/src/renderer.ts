@@ -68,7 +68,10 @@ export interface Scene {
 const FONT_SIZE = 15;
 const TEXT_ZOOM_MIN = 0.3;
 const DETAIL_ZOOM_MIN = 0.08;
-const FONT_STACK = "-apple-system, system-ui, sans-serif";
+// system-ui first: Safari's canvas font parser mishandles -apple-system
+// (weight selection falls back to synthesized faces, which smear), while
+// system-ui resolves to the same San Francisco with true weights.
+const FONT_STACK = 'system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif';
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -110,9 +113,13 @@ export class Renderer {
     ctx.fillStyle = CANVAS_BG;
     ctx.fillRect(0, 0, this.width, this.height);
 
+    // Snap the device-space translation to whole pixels: a fractional
+    // pan puts every edge on the board — strokes, fills, glyphs — just
+    // off the pixel grid, and the whole canvas reads as uniformly soft
+    // next to the crisp DOM around it.
     ctx.setTransform(
       this.dpr * z, 0, 0, this.dpr * z,
-      -camera.x * z * this.dpr, -camera.y * z * this.dpr,
+      Math.round(-camera.x * z * this.dpr), Math.round(-camera.y * z * this.dpr),
     );
 
     const view = visibleWorldRect(camera, this.width, this.height);

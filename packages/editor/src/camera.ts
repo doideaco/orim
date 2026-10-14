@@ -26,9 +26,12 @@ export const toWorld = (cam: Camera, p: Point): Point => ({
   y: p.y / cam.zoom + cam.y,
 });
 
-/** Zoom about a fixed screen point so the world under the cursor stays put. */
+/** Zoom about a fixed screen point so the world under the cursor stays put.
+ *  Landing near 100% snaps to exactly 1, where world units hit the pixel
+ *  grid dead on — a zoom of 1.003 renders every edge fractionally soft. */
 export function zoomAt(cam: Camera, screen: Point, factor: number): Camera {
-  const zoom = Math.min(4, Math.max(0.02, cam.zoom * factor));
+  let zoom = Math.min(4, Math.max(0.02, cam.zoom * factor));
+  if (Math.abs(zoom - 1) < 0.015) zoom = 1;
   const before = toWorld(cam, screen);
   const next = { ...cam, zoom };
   const after = toWorld(next, screen);
