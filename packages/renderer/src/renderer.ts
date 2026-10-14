@@ -544,8 +544,19 @@ export class Renderer {
   ): { scale: number; offsetX: number; offsetY: number } | null {
     const ctx = mini.getContext("2d");
     if (!ctx) return null;
-    const W = mini.width;
-    const H = mini.height;
+    // The minimap is its own canvas: back it at device resolution or it
+    // draws at half scale on every retina screen, permanently soft.
+    const W = mini.clientWidth || mini.width;
+    const H = mini.clientHeight || mini.height;
+    const bw = Math.round(W * this.dpr);
+    const bh = Math.round(H * this.dpr);
+    if (mini.width !== bw || mini.height !== bh) {
+      mini.width = bw;
+      mini.height = bh;
+      mini.style.width = `${W}px`;
+      mini.style.height = `${H}px`;
+    }
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "rgba(255,255,255,0.94)";
     ctx.fillRect(0, 0, W, H);
