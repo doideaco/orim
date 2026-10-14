@@ -832,7 +832,10 @@ export class Renderer {
     ctx.restore();
     ctx.fillStyle = "#374151";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, this.snap(mid.x - tw / 2), this.snap(mid.y + 0.5));
+    const lx = this.snap(mid.x - tw / 2);
+    const ly = this.snap(mid.y + 0.5);
+    ctx.fillText(label, lx, ly);
+    ctx.fillText(label, lx, ly);
     ctx.textBaseline = "top";
   }
 
@@ -871,12 +874,15 @@ export class Renderer {
       : n.y + padding;
     for (const line of lines) {
       if (ty + lineH > n.y + n.h - padding / 2) break;
-      if (centered) {
-        const tw = ctx.measureText(line).width;
-        ctx.fillText(line, this.snap(n.x + (n.w - tw) / 2), this.snap(ty));
-      } else {
-        ctx.fillText(line, this.snap(n.x + padding), this.snap(ty));
-      }
+      const tx = centered
+        ? this.snap(n.x + (n.w - ctx.measureText(line).width) / 2)
+        : this.snap(n.x + padding);
+      const sy = this.snap(ty);
+      // Double strike: WebKit's grayscale canvas AA leaves glyph stems
+      // short of full ink; filling twice densifies coverage into solid
+      // cores without widening the letterforms.
+      ctx.fillText(line, tx, sy);
+      ctx.fillText(line, tx, sy);
       ty += lineH;
     }
   }

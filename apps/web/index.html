@@ -30,6 +30,11 @@
         font-family: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
         background: var(--bg);
         color: var(--ink);
+        /* Match the canvas: WebKit renders DOM text with gamma-boosted
+           smoothing but canvas text with plain grayscale AA, so canvas
+           reads washed-out next to default DOM text. One antialiasing
+           mode everywhere removes the contrast. */
+        -webkit-font-smoothing: antialiased;
       }
       #canvas { position: fixed; inset: 0; touch-action: none; }
       #overlay-root { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
